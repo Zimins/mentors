@@ -368,7 +368,7 @@ export function LearningMaterialPreviewCard({
       <div className="px-3.5 py-1.5 bg-slate-950/90 border-t border-white/[0.06] flex items-center justify-between gap-2 text-[10px] text-slate-400">
         <span className="truncate">{displayedMaterial.controlsHint}</span>
         <span className="shrink-0 font-mono text-slate-500">
-          Gemini 4 Argon · {activeMeta.koreanHint}
+          Gemini 4 Argon · {activeMeta.shortLabel}
         </span>
       </div>
     </div>

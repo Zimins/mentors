@@ -103,51 +103,51 @@ const CURATED_FALLBACK_NUDGES: Record<
     struggledConcept: 'Ser vs. Estar (Permanent Identity vs. Temporary State)',
     recommendedFormat: 'mini_game',
     aiSituationJudgment:
-      'AI Context Judge: Learner is active in studio; detected previous hesitation on Spanish "Soy vs. Estoy" in #02-ser-vs-estar-core-verbs & generated an interactive Mini Game.',
+      'AI Context Judge: Learner is active in studio; detected previous hesitation on Spanish "Soy vs. Estoy" in #02-ser-vs-estar-and-verbs & generated an interactive Mini Game.',
     bannerHeadline:
-      '👋 ¡Hola! Welcome back! Ready to continue #02-ser-vs-estar-core-verbs?',
+      '👋 ¡Hola! Welcome back! Ready to continue #02-ser-vs-estar-and-verbs?',
     bannerMessage:
       'Last time you found "Ser vs. Estar" a bit tricky, so I just built an easy-to-understand Spanish Mini Game & 3D sentence map for you! Come check it out! (저번에 헷갈려했던 Ser vs. Estar 개념, 한눈에 이해할 수 있는 쉬운 미니게임과 3D 프리뷰로 만들어뒀어! 이어서 보러 올래?)',
     ctaButtonLabel: 'Open Mina’s Spanish Mini Game (+30 🍬) →',
-    channelFollowUpMessage: `¡Hola! Welcome back to **#02-ser-vs-estar-core-verbs**! 🎉\n\nI noticed you were studying hard in the studio! Last time, distinguishing **Ser** (*Soy de Corea* — permanent identity/origin) from **Estar** (*Estoy en Madrid / Estoy feliz* — location & temporary emotion) was a little tricky.\n\nSo I built an **easy-to-understand playable Mini Game & 3D Sentence Map** right below! Click through the live rounds to master *Ser vs. Estar* in 60 seconds and claim **+30 🍬 Candy**!`,
+    channelFollowUpMessage: `¡Hola! Welcome back to **#02-ser-vs-estar-and-verbs**! 🎉\n\nI noticed you were studying hard in the studio! Last time, distinguishing **Ser** (*Soy de Corea* — permanent identity/origin) from **Estar** (*Estoy en Madrid / Estoy feliz* — location & temporary emotion) was a little tricky.\n\nSo I built an **easy-to-understand playable Mini Game & 3D Sentence Map** right below! Click through the live rounds to master *Ser vs. Estar* in 60 seconds and claim **+30 🍬 Candy**!`,
   },
   'vibe-coding': {
     struggledConcept: 'Breaking out of AI Bug Loops with Context Engineering',
     recommendedFormat: '3d_preview',
     aiSituationJudgment:
-      'AI Context Judge: Detected unfinished module in #03-context-debugging-no-loops; synthesized a 3D Prompt-to-Debug Flywheel Preview to resolve the learner’s previous bottleneck.',
+      'AI Context Judge: Detected unfinished module in #03-agentic-debugging-and-context; synthesized a 3D Prompt-to-Debug Flywheel Preview to resolve the learner’s previous bottleneck.',
     bannerHeadline:
       '⚡ Hey Builder! Welcome! Your next Vibe Coding topic is ready!',
     bannerMessage:
       'Last time you got stuck when the AI coding agent entered a bug loop, so I built an easy-to-understand 3D Preview showing exact Context Engineering guardrails! Come take a look! (저번에 어려워했던 AI 버그 루프 탈출법, 직관적으로 이해할 수 있는 3D 프리뷰로 방금 만들어뒀어! 이어서 공부하러 와봐!)',
     ctaButtonLabel: 'Inspect Bolt’s 3D Vibe Coding Preview (+25 🍬) →',
-    channelFollowUpMessage: `Welcome back to **#03-context-debugging-no-loops**! ⚡\n\nLast time we talked about how frustrating it is when an AI coding agent keeps breaking one file while fixing another. To make it crystal clear, I just generated an **easy-to-understand interactive 3D Preview** of the **Spec → Vertical Slice → Stack Trace Guardrail** loop right below!\n\nOrbit the 3D nodes or play the interactive preview below to earn **+25 🍬 Candy**!`,
+    channelFollowUpMessage: `Welcome back to **#03-agentic-debugging-and-context**! ⚡\n\nLast time we talked about how frustrating it is when an AI coding agent keeps breaking one file while fixing another. To make it crystal clear, I just generated an **easy-to-understand interactive 3D Preview** of the **Spec → Vertical Slice → Stack Trace Guardrail** loop right below!\n\nOrbit the 3D nodes or play the interactive preview below to earn **+25 🍬 Candy**!`,
   },
   'dating-coach': {
     struggledConcept:
-      'Transitioning from a First Opener to Natural Conversation without Awkward Silence',
+      'Transitioning from a First Opener to Playful Banter without Interview Mode',
     recommendedFormat: 'mini_game',
     aiSituationJudgment:
-      'AI Context Judge: Identified learner’s next milestone in #02-natural-openers-zero-awkward; created an interactive Conversation Flow Mini Game for stress-free practice.',
+      'AI Context Judge: Identified learner’s next milestone in #02-magnetic-banter-and-active-listening; created an interactive Conversation Flow Mini Game for stress-free practice.',
     bannerHeadline:
       '💖 Welcome! Sora has your next Dating & Social Confidence mission ready!',
     bannerMessage:
       'Last time you weren’t sure how to keep the conversation flowing after saying hi, so I made a super easy interactive Conversation Mini Game & 3D Vibe Map for you! Come try it! (저번에 막막해했던 첫 대화 이어가기 & 어색한 침묵 깨기, 쉽게 감 잡을 수 있는 대화 미니게임으로 만들어뒀어! 와서 해볼래?)',
     ctaButtonLabel: 'Try Sora’s Conversation Mini Game (+30 🍬) →',
-    channelFollowUpMessage: `Welcome back to **#02-natural-openers-zero-awkward**! 💖\n\nLast time you mentioned worrying about awkward silences right after the first greeting. Don't worry—I just built an **easy-to-understand interactive Mini Game & 3D Social Vibe Map** right below so you can practice the **Observation → Open Follow-Up → Shared Story** flow hands-on!\n\nGive it a try below and claim your **+30 🍬 Candy** reward!`,
+    channelFollowUpMessage: `Welcome back to **#02-magnetic-banter-and-active-listening**! 💖\n\nLast time you mentioned worrying about awkward silences right after the first greeting. Don't worry—I just built an **easy-to-understand interactive Mini Game & 3D Social Vibe Map** right below so you can practice the **Observation → Open Follow-Up → Shared Story** flow hands-on!\n\nGive it a try below and claim your **+30 🍬 Candy** reward!`,
   },
   'korea-history': {
     struggledConcept:
       'How King Sejong Designed Hangul (훈민정음) Around Vocal Organ Geometry in 1443',
     recommendedFormat: '3d_preview',
     aiSituationJudgment:
-      'AI Context Judge: Learner has an upcoming chapter in #02-king-sejong-and-hangul-1443; generated an interactive 3D Hangul & Joseon Science Preview to clarify phonetic geometry.',
+      'AI Context Judge: Learner has an upcoming chapter in #03-king-sejong-and-hunminjeongeum; generated an interactive 3D Hangul & Joseon Science Preview to clarify phonetic geometry.',
     bannerHeadline:
       '🏛️ Welcome! Ms. Han prepared your next Korean History chapter!',
     bannerMessage:
       'Last time the scientific structure of King Sejong’s Hangul (훈민정음) and Joseon inventions felt complex, so I built an easy-to-understand 3D Preview for you! Come explore it! (저번에 헷갈려했던 세종대왕의 훈민정음 창제 원리와 조선 과학사, 쉽게 이해할 수 있는 3D 프리뷰로 만들어뒀어! 보러 올래?)',
     ctaButtonLabel: 'Explore Ms. Han’s 3D History Preview (+25 🍬) →',
-    channelFollowUpMessage: `Welcome back to **#02-king-sejong-and-hangul-1443**! 🏛️\n\nLast time, remembering how King Sejong modeled the root consonants (**ㄱ, ㄴ, ㅁ, ㅅ, ㅇ**) after the physical shape of the mouth and vocal organs—and combined **천(·), 지(ㅡ), 인(ㅣ)** for vowels—was a lot to take in.\n\nI just created an **easy-to-understand interactive 3D Preview** right below so you can visually inspect each node of Joseon's Golden Age!`,
+    channelFollowUpMessage: `Welcome back to **#03-king-sejong-and-hunminjeongeum**! 🏛️\n\nLast time, remembering how King Sejong modeled the root consonants (**ㄱ, ㄴ, ㅁ, ㅅ, ㅇ**) after the physical shape of the mouth and vocal organs—and combined **천(·), 지(ㅡ), 인(ㅣ)** for vowels—was a lot to take in.\n\nI just created an **easy-to-understand interactive 3D Preview** right below so you can visually inspect each node of Joseon's Golden Age!`,
   },
   'cs-professor': {
     struggledConcept:
@@ -180,7 +180,7 @@ export async function POST(req: NextRequest) {
       body.targetMentorSubject || 'Basic Spanish (Everyday & Travel Spanish)';
     const targetMentorShortTag = body.targetMentorShortTag || 'Basic Spanish';
     const targetChannelSlug =
-      body.targetChannelSlug || '02-ser-vs-estar-core-verbs';
+      body.targetChannelSlug || '02-ser-vs-estar-and-verbs';
     const targetChannelTitle =
       body.targetChannelTitle || 'Ser vs. Estar & Core Verbs';
     const studentLevel: StudentLevel = body.studentLevel || 'intermediate';

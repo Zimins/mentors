@@ -31,6 +31,7 @@ interface HoneycombCell {
 }
 
 const CUSTOM_CHARACTER_OPTIONS = [
+  // Original 8 core mentors (jun, mina, sora upgraded with combinatorial parts)
   { label: 'Prof. Jun', riv: '/riv/jun.riv', color: '#38bdf8' },
   { label: 'Mina', riv: '/riv/mina.riv', color: '#34d399' },
   { label: 'Bolt', riv: '/riv/bolt.riv', color: '#6366f1' },
@@ -39,6 +40,39 @@ const CUSTOM_CHARACTER_OPTIONS = [
   { label: 'Sora', riv: '/riv/sora.riv', color: '#a855f7' },
   { label: 'Nabi', riv: '/riv/nabi.riv', color: '#f97316' },
   { label: 'Mong', riv: '/riv/mong.riv', color: '#14b8a6' },
+  // 10 New Duolingo-style custom characters
+  { label: 'Hoot', riv: '/riv/hoot.riv', color: '#f59e0b' },
+  { label: 'Roxy', riv: '/riv/roxy.riv', color: '#f97316' },
+  { label: 'Barnaby', riv: '/riv/barnaby.riv', color: '#a855f7' },
+  { label: 'Spark', riv: '/riv/spark.riv', color: '#38bdf8' },
+  { label: 'Toto', riv: '/riv/toto.riv', color: '#10b981' },
+  { label: 'Hana', riv: '/riv/hana.riv', color: '#ec4899' },
+  { label: 'Leo', riv: '/riv/leo.riv', color: '#ef4444' },
+  { label: 'Maya', riv: '/riv/maya.riv', color: '#818cf8' },
+  { label: 'Kenji', riv: '/riv/kenji.riv', color: '#06b6d4' },
+  { label: 'Claire', riv: '/riv/claire.riv', color: '#eab308' },
+  // Combinatorial human avatars
+  { label: 'Aria', riv: '/riv/aria.riv', color: '#f43f5e' },
+  { label: 'Marcus', riv: '/riv/marcus.riv', color: '#3b82f6' },
+  { label: 'Diego', riv: '/riv/diego.riv', color: '#f97316' },
+  { label: 'Elena', riv: '/riv/elena.riv', color: '#a855f7' },
+  { label: 'Tariq', riv: '/riv/tariq.riv', color: '#14b8a6' },
+  { label: 'Chloe', riv: '/riv/chloe.riv', color: '#ec4899' },
+  { label: 'Noah', riv: '/riv/noah.riv', color: '#38bdf8' },
+  { label: 'Priya', riv: '/riv/priya.riv', color: '#f59e0b' },
+  { label: 'Liam', riv: '/riv/liam.riv', color: '#22c55e' },
+  { label: 'Mei', riv: '/riv/mei.riv', color: '#fb7185' },
+  { label: 'Omar', riv: '/riv/omar.riv', color: '#6366f1' },
+  { label: 'Zoe', riv: '/riv/zoe.riv', color: '#2dd4bf' },
+  { label: 'Lucas', riv: '/riv/lucas.riv', color: '#60a5fa' },
+  { label: 'Nadia', riv: '/riv/nadia.riv', color: '#c084fc' },
+  { label: 'Felix', riv: '/riv/felix.riv', color: '#fbbf24' },
+  { label: 'Yuki', riv: '/riv/yuki.riv', color: '#38bdf8' },
+  { label: 'Hassan', riv: '/riv/hassan.riv', color: '#34d399' },
+  { label: 'Iris', riv: '/riv/iris.riv', color: '#f472b6' },
+  { label: 'Victor', riv: '/riv/victor.riv', color: '#818cf8' },
+  { label: 'Jin', riv: '/riv/jin.riv', color: '#2dd4bf' },
+  { label: 'Yuna', riv: '/riv/yuna.riv', color: '#fb923c' },
 ];
 
 // Vibrant Mentos-like circular candy palettes
@@ -128,10 +162,11 @@ function getPreviewCurriculumForSubject(subject: string, shortTag: string): stri
   ];
 }
 
-// Mentor catalog cycling the 8 expressive .riv files with the featured demo subjects
+// Mentor catalog featuring all 39 expressive .riv files (8 core + 10 custom characters + 21 combinatorial avatars)
 const HONEYCOMB_CATALOG: Array<
   Omit<HoneycombCell, 'id' | 'baseX' | 'baseY' | 'dist' | 'ringScale' | 'discBackground'>
 > = [
+  // --- Ring 1: Core 8 Mentors ---
   {
     baseMentorId: 'cs-professor',
     name: 'Prof. Jun',
@@ -212,85 +247,319 @@ const HONEYCOMB_CATALOG: Array<
     accentColor: '#818cf8',
     secondaryColor: '#4f46e5',
   },
-  {
-    baseMentorId: 'cs-professor',
-    name: 'Prof. Jun',
-    roleTitle: 'Computer Science 101 Professor',
-    subject: 'CS 101: Binary, Memory & OS Internals',
-    shortTag: 'CS 101',
-    rivFile: '/riv/jun.riv',
-    accentColor: '#38bdf8',
-    secondaryColor: '#0284c7',
-  },
-  {
-    baseMentorId: 'basic-spanish',
-    name: 'Mina',
-    roleTitle: 'Spanish Travel & Tapas Coach',
-    subject: 'Basic Spanish: Greetings, Ser/Estar & Café Talk',
-    shortTag: 'Basic Spanish',
-    rivFile: '/riv/mina.riv',
-    accentColor: '#f97316',
-    secondaryColor: '#ea580c',
-  },
-  {
-    baseMentorId: 'vibe-coding',
-    name: 'Bolt',
-    roleTitle: 'AI App & Prompt Architect',
-    subject: 'Vibe Coding: Prompting, UI Slices & Cloud Ship',
-    shortTag: 'Vibe Coding',
-    rivFile: '/riv/bolt.riv',
-    accentColor: '#a855f7',
-    secondaryColor: '#7e22ce',
-  },
-  {
-    baseMentorId: 'dating-coach',
-    name: 'Sora',
-    roleTitle: 'Dating & Charisma Coach',
-    subject: 'How to Make a Girlfriend: Openers & First Dates',
-    shortTag: 'Dating Coach',
-    rivFile: '/riv/sora.riv',
-    accentColor: '#ec4899',
-    secondaryColor: '#be185d',
-  },
+
+  // --- Ring 2: 10 New Duolingo-Style Custom Characters ---
   {
     baseMentorId: 'korea-history',
-    name: 'Ms. Han',
-    roleTitle: 'Joseon & Hangul Historian',
-    subject: 'Korean History: Three Kingdoms, Sejong & Han Miracle',
-    shortTag: 'Korea History',
-    rivFile: '/riv/ms-han.riv',
+    name: 'Prof. Hoot',
+    roleTitle: 'World Philosophy & Classics Owl',
+    subject: 'Korean History & Classical Wisdom',
+    shortTag: 'Classics',
+    rivFile: '/riv/hoot.riv',
     accentColor: '#f59e0b',
     secondaryColor: '#b45309',
   },
   {
-    baseMentorId: 'algo-coach',
-    name: 'Coach Pen',
-    roleTitle: 'Coding Interview Strategist',
-    subject: 'Graph Search, Trees & Big-O Mastery',
-    shortTag: 'Algorithms',
-    rivFile: '/riv/coach-pen.riv',
-    accentColor: '#34d399',
-    secondaryColor: '#059669',
+    baseMentorId: 'vibe-coding',
+    name: 'Roxy',
+    roleTitle: 'Clever Product & Growth Fox',
+    subject: 'Vibe Coding: Rapid Prototyping & Growth',
+    shortTag: 'Product Vibe',
+    rivFile: '/riv/roxy.riv',
+    accentColor: '#f97316',
+    secondaryColor: '#c2410c',
+  },
+  {
+    baseMentorId: 'cs-professor',
+    name: 'Barnaby',
+    roleTitle: 'Gentle Systems & Rust Bear',
+    subject: 'CS 101: Memory Safety & Systems Foundations',
+    shortTag: 'Systems CS',
+    rivFile: '/riv/barnaby.riv',
+    accentColor: '#a855f7',
+    secondaryColor: '#6b21a8',
   },
   {
     baseMentorId: 'ai-companion',
-    name: 'Mong',
-    roleTitle: 'LLM & Attention Researcher',
-    subject: 'Transformers, Embeddings & AI Agents',
-    shortTag: 'AI & LLMs',
-    rivFile: '/riv/mong.riv',
+    name: 'Spark',
+    roleTitle: 'Autonomous AI & Robotics Bot',
+    subject: 'AI Agents, Neural Nets & Robotics Control',
+    shortTag: 'AI Robotics',
+    rivFile: '/riv/spark.riv',
+    accentColor: '#38bdf8',
+    secondaryColor: '#0284c7',
+  },
+  {
+    baseMentorId: 'algo-coach',
+    name: 'Master Toto',
+    roleTitle: 'Dynamic Programming & Math Turtle',
+    subject: 'Algorithms: Step-by-Step Recursion & DP',
+    shortTag: 'Recursion',
+    rivFile: '/riv/toto.riv',
+    accentColor: '#10b981',
+    secondaryColor: '#047857',
+  },
+  {
+    baseMentorId: 'dating-coach',
+    name: 'Hana',
+    roleTitle: 'Warm Empathy & Conversation Coach',
+    subject: 'Social Confidence, Empathy & Active Listening',
+    shortTag: 'Social Skills',
+    rivFile: '/riv/hana.riv',
+    accentColor: '#ec4899',
+    secondaryColor: '#be185d',
+  },
+  {
+    baseMentorId: 'basic-spanish',
+    name: 'Chef Leo',
+    roleTitle: 'Culinary Spanish & Tapas Maestro',
+    subject: 'Spanish Conversation Through Food & Travel',
+    shortTag: 'Travel Spanish',
+    rivFile: '/riv/leo.riv',
+    accentColor: '#ef4444',
+    secondaryColor: '#b91c1c',
+  },
+  {
+    baseMentorId: 'astro-guide',
+    name: 'Maya',
+    roleTitle: 'Deep Space & Exoplanet Astronomer',
+    subject: 'Astrophysics: Starlight, Orbits & Relativity',
+    shortTag: 'Astrophysics',
+    rivFile: '/riv/maya.riv',
+    accentColor: '#818cf8',
+    secondaryColor: '#4338ca',
+  },
+  {
+    baseMentorId: 'vibe-coding',
+    name: 'Kenji',
+    roleTitle: 'Creative Audio & WebGL Technologist',
+    subject: 'Vibe Coding: Interactive Shaders & Synth UI',
+    shortTag: 'Creative Code',
+    rivFile: '/riv/kenji.riv',
+    accentColor: '#06b6d4',
+    secondaryColor: '#0e7490',
+  },
+  {
+    baseMentorId: 'algo-coach',
+    name: 'Detective Claire',
+    roleTitle: 'Root-Cause Debugging & Logic Sleuth',
+    subject: 'Algorithms & Binary Search Investigation',
+    shortTag: 'Debugging',
+    rivFile: '/riv/claire.riv',
+    accentColor: '#eab308',
+    secondaryColor: '#a16207',
+  },
+
+  // --- Ring 3: 21 Combinatorial Human Avatar Mentors ---
+  {
+    baseMentorId: 'vibe-coding',
+    name: 'Aria',
+    roleTitle: 'Design Systems & UI Engineer',
+    subject: 'Vibe Coding: Design Tokens & Micro-Interactions',
+    shortTag: 'UI Engineering',
+    rivFile: '/riv/aria.riv',
     accentColor: '#f43f5e',
     secondaryColor: '#be123c',
   },
   {
+    baseMentorId: 'cs-professor',
+    name: 'Marcus',
+    roleTitle: 'Distributed Systems Architect',
+    subject: 'CS 101: Consensus, Clocks & Network Packets',
+    shortTag: 'Distributed CS',
+    rivFile: '/riv/marcus.riv',
+    accentColor: '#3b82f6',
+    secondaryColor: '#1d4ed8',
+  },
+  {
+    baseMentorId: 'basic-spanish',
+    name: 'Diego',
+    roleTitle: 'Madrid & Latin America Spanish Guide',
+    subject: 'Basic Spanish: Real-World Fluency & Idioms',
+    shortTag: 'Spanish Fluency',
+    rivFile: '/riv/diego.riv',
+    accentColor: '#f97316',
+    secondaryColor: '#c2410c',
+  },
+  {
+    baseMentorId: 'ai-companion',
+    name: 'Elena',
+    roleTitle: 'Multimodal Alignment Researcher',
+    subject: 'AI & LLMs: Vision-Language Models & RAG',
+    shortTag: 'Multimodal AI',
+    rivFile: '/riv/elena.riv',
+    accentColor: '#a855f7',
+    secondaryColor: '#7e22ce',
+  },
+  {
+    baseMentorId: 'algo-coach',
+    name: 'Tariq',
+    roleTitle: 'Competitive Programming Coach',
+    subject: 'Graph Theory, Shortest Paths & Heaps',
+    shortTag: 'Graph Theory',
+    rivFile: '/riv/tariq.riv',
+    accentColor: '#14b8a6',
+    secondaryColor: '#0f766e',
+  },
+  {
+    baseMentorId: 'dating-coach',
+    name: 'Chloe',
+    roleTitle: 'Modern Dating & Charisma Mentor',
+    subject: 'Relationship Psychology & First Impressions',
+    shortTag: 'Charisma',
+    rivFile: '/riv/chloe.riv',
+    accentColor: '#ec4899',
+    secondaryColor: '#be185d',
+  },
+  {
+    baseMentorId: 'cs-professor',
+    name: 'Noah',
+    roleTitle: 'Linux Kernel & Compilers Mentor',
+    subject: 'CS 101: Assembly, Stack Frames & Virtual Memory',
+    shortTag: 'OS & Compilers',
+    rivFile: '/riv/noah.riv',
+    accentColor: '#38bdf8',
+    secondaryColor: '#0369a1',
+  },
+  {
+    baseMentorId: 'ai-companion',
+    name: 'Priya',
+    roleTitle: 'Deep Learning & Transformer Architect',
+    subject: 'AI: Self-Attention, Gradients & Fine-Tuning',
+    shortTag: 'Deep Learning',
+    rivFile: '/riv/priya.riv',
+    accentColor: '#f59e0b',
+    secondaryColor: '#b45309',
+  },
+  {
+    baseMentorId: 'vibe-coding',
+    name: 'Liam',
+    roleTitle: 'Full-Stack Startup Builder',
+    subject: 'Vibe Coding: Zero-to-One Fullstack Shipping',
+    shortTag: 'Startup Ship',
+    rivFile: '/riv/liam.riv',
+    accentColor: '#22c55e',
+    secondaryColor: '#15803d',
+  },
+  {
+    baseMentorId: 'korea-history',
+    name: 'Mei',
+    roleTitle: 'East Asian Art & Dynasty Historian',
+    subject: 'Korean History: Goryeo Celadon & Joseon Scholars',
+    shortTag: 'Dynasty History',
+    rivFile: '/riv/mei.riv',
+    accentColor: '#fb7185',
+    secondaryColor: '#be123c',
+  },
+  {
     baseMentorId: 'astro-guide',
-    name: 'Nabi',
-    roleTitle: 'Black Hole & Exoplanet Guide',
-    subject: 'Relativistic Orbits & Deep Space',
-    shortTag: 'Cosmos',
-    rivFile: '/riv/nabi.riv',
+    name: 'Omar',
+    roleTitle: 'Orbital Mechanics & Propulsion Lead',
+    subject: 'Astrophysics: Lagrange Points & Trajectory Math',
+    shortTag: 'Orbital Math',
+    rivFile: '/riv/omar.riv',
+    accentColor: '#6366f1',
+    secondaryColor: '#4338ca',
+  },
+  {
+    baseMentorId: 'dating-coach',
+    name: 'Zoe',
+    roleTitle: 'Social Dynamics & Banter Coach',
+    subject: 'How to Make a Girlfriend: Natural Banter & Dates',
+    shortTag: 'Banter Coach',
+    rivFile: '/riv/zoe.riv',
+    accentColor: '#2dd4bf',
+    secondaryColor: '#0f766e',
+  },
+  {
+    baseMentorId: 'algo-coach',
+    name: 'Lucas',
+    roleTitle: 'System Design & Scalability Mentor',
+    subject: 'Algorithms, Caching & High-Throughput Trees',
+    shortTag: 'System Design',
+    rivFile: '/riv/lucas.riv',
+    accentColor: '#60a5fa',
+    secondaryColor: '#2563eb',
+  },
+  {
+    baseMentorId: 'basic-spanish',
+    name: 'Nadia',
+    roleTitle: 'Romance Languages & Phonetics Coach',
+    subject: 'Basic Spanish: Pronunciation & Everyday Verbs',
+    shortTag: 'Phonetics',
+    rivFile: '/riv/nadia.riv',
+    accentColor: '#c084fc',
+    secondaryColor: '#7e22ce',
+  },
+  {
+    baseMentorId: 'cs-professor',
+    name: 'Felix',
+    roleTitle: 'Computer Graphics & GPU Mentor',
+    subject: 'CS 101: Binary Math, Matrices & Raytracing',
+    shortTag: 'GPU & Math',
+    rivFile: '/riv/felix.riv',
+    accentColor: '#fbbf24',
+    secondaryColor: '#b45309',
+  },
+  {
+    baseMentorId: 'korea-history',
+    name: 'Yuki',
+    roleTitle: 'Modern Cultural & K-Wave Analyst',
+    subject: 'Korean History: Han River Miracle to Global Pop',
+    shortTag: 'Modern Korea',
+    rivFile: '/riv/yuki.riv',
+    accentColor: '#38bdf8',
+    secondaryColor: '#0284c7',
+  },
+  {
+    baseMentorId: 'ai-companion',
+    name: 'Hassan',
+    roleTitle: 'Reinforcement Learning Specialist',
+    subject: 'AI: Policy Gradients, World Models & Reasoning',
+    shortTag: 'RL & Agents',
+    rivFile: '/riv/hassan.riv',
+    accentColor: '#34d399',
+    secondaryColor: '#059669',
+  },
+  {
+    baseMentorId: 'dating-coach',
+    name: 'Iris',
+    roleTitle: 'Relationship Communication Specialist',
+    subject: 'Authentic Confidence & Emotional Intelligence',
+    shortTag: 'EQ & Dating',
+    rivFile: '/riv/iris.riv',
+    accentColor: '#f472b6',
+    secondaryColor: '#db2777',
+  },
+  {
+    baseMentorId: 'astro-guide',
+    name: 'Victor',
+    roleTitle: 'Relativity & Black Hole Physicist',
+    subject: 'Astrophysics: Event Horizons & Gravitational Lensing',
+    shortTag: 'Black Holes',
+    rivFile: '/riv/victor.riv',
     accentColor: '#818cf8',
     secondaryColor: '#4f46e5',
+  },
+  {
+    baseMentorId: 'algo-coach',
+    name: 'Jin',
+    roleTitle: 'Low-Latency Algorithms Engineer',
+    subject: 'Data Structures: Lock-Free Queues & Bitwise Tricks',
+    shortTag: 'Fast Algos',
+    rivFile: '/riv/jin.riv',
+    accentColor: '#2dd4bf',
+    secondaryColor: '#0d9488',
+  },
+  {
+    baseMentorId: 'korea-history',
+    name: 'Yuna',
+    roleTitle: 'Hangul Linguistics & Royal Court Guide',
+    subject: 'Korean History: King Sejong & 1443 Hangul Science',
+    shortTag: 'Hangul 1443',
+    rivFile: '/riv/yuna.riv',
+    accentColor: '#fb923c',
+    secondaryColor: '#ea580c',
   },
 ];
 
@@ -554,6 +823,26 @@ export function WatchHoneycomb() {
     router.push('/mentor/cs-professor?demo=true');
   };
 
+  const handlePickMentorAround = () => {
+    const candidates = activeCells.filter((cell) =>
+      isMobileViewport
+        ? Math.abs(cell.baseX) <= 125 && Math.abs(cell.baseY) <= 235
+        : Math.abs(cell.baseX) <= 460 && Math.abs(cell.baseY) <= 280
+    );
+    const pool = candidates.length > 0 ? candidates : activeCells;
+    if (pool.length === 0) return;
+
+    const currentId = hoveredCellId ?? spotlightCellId;
+    const available =
+      pool.length > 1 ? pool.filter((c) => c.id !== currentId) : pool;
+    const chosen =
+      available[Math.floor(Math.random() * available.length)] || pool[0];
+
+    setHoveredCellId(null);
+    setPointerPos(null);
+    setSpotlightCellId(chosen.id);
+  };
+
   const handleCreateCustomMentor = (e: React.FormEvent) => {
     e.preventDefault();
     const params = new URLSearchParams({
@@ -764,9 +1053,11 @@ export function WatchHoneycomb() {
                       </div>
                     </div>
 
-                    {/* Floating pill label shown on hover OR when randomly spotlighted on mobile/idle */}
-                    {(isHovered || isSpotlight) && (
-                      <div className="pointer-events-none absolute -bottom-7 left-1/2 -translate-x-1/2 z-50 px-2.5 py-0.5 rounded-full bg-slate-950/95 border border-white/25 shadow-[0_8px_24px_rgba(0,0,0,0.9)] whitespace-nowrap flex items-center gap-1.5 animate-in fade-in zoom-in-95 duration-200">
+                    {/* Label below mentor profile:
+                        - Hovered / Mobile Spotlight: Full pill with Mentor Name + Specialty
+                        - Default (Idle): Subtle light-gray specialty tag (shortTag) */}
+                    {isHovered || isSpotlight ? (
+                      <div className="pointer-events-none absolute top-[calc(100%+8px)] left-1/2 -translate-x-1/2 z-50 px-2.5 py-0.5 rounded-full bg-slate-950/95 border border-white/25 shadow-[0_8px_24px_rgba(0,0,0,0.9)] whitespace-nowrap flex items-center gap-1.5 animate-in fade-in zoom-in-95 duration-200">
                         <span
                           className="w-1.5 h-1.5 rounded-full animate-pulse"
                           style={{ backgroundColor: cell.accentColor }}
@@ -781,6 +1072,14 @@ export function WatchHoneycomb() {
                         >
                           {cell.shortTag}
                         </span>
+                      </div>
+                    ) : (
+                      <div
+                        className={`pointer-events-none absolute top-[calc(100%+6px)] left-1/2 -translate-x-1/2 z-30 whitespace-nowrap text-[10px] sm:text-[11px] font-medium text-slate-400/90 tracking-tight drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)] transition-opacity duration-500 ${
+                          isMentosFlipped ? 'opacity-100' : 'opacity-0'
+                        }`}
+                      >
+                        {cell.shortTag}
                       </div>
                     )}
                   </button>
@@ -804,7 +1103,7 @@ export function WatchHoneycomb() {
             curriculum step by step.
           </p>
 
-          {/* Main Start Buttons: Try Demo & Meet My Own */}
+          {/* Main Start Buttons: Try Demo & Pick a Mentor Around You */}
           <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
             <button
               type="button"
@@ -817,11 +1116,11 @@ export function WatchHoneycomb() {
 
             <button
               type="button"
-              onClick={() => setIsMeetModalOpen(true)}
+              onClick={handlePickMentorAround}
               className="min-w-[144px] sm:min-w-[160px] inline-flex items-center justify-center gap-2 px-5 sm:px-6 py-2.5 sm:py-3 rounded-full font-bold text-xs sm:text-sm text-white bg-white/[0.08] hover:bg-white/[0.15] border border-white/20 active:scale-[0.98] transition-all cursor-pointer"
             >
-              <Wand2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-300" />
-              <span>Meet My Own</span>
+              <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-sky-300" />
+              <span>Pick a Mentor Around You</span>
             </button>
           </div>
         </div>
@@ -1122,7 +1421,7 @@ export function WatchHoneycomb() {
               {/* LEFT HUB: MENTOR + GEMINI ARGON CORE */}
               <div className="lg:col-span-4 flex flex-col items-center lg:items-start text-center lg:text-left">
                 <div className="flex items-center gap-4">
-                  <div className="relative">
+                  <div className="relative shrink-0">
                     <span className="pointer-events-none absolute -inset-2 rounded-full bg-gradient-to-tr from-sky-500/25 via-indigo-500/25 to-purple-500/25 blur-md" />
                     <RiveAvatar
                       rivSrc="/riv/bolt.riv"
@@ -1134,15 +1433,17 @@ export function WatchHoneycomb() {
                       mentorName="Bolt"
                       stateMachineName="Character"
                     />
-                    <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-indigo-500 text-white whitespace-nowrap shadow">
-                      Gemini Argon
-                    </span>
                   </div>
                   <div>
-                    <div className="text-[11px] font-bold uppercase tracking-wider text-indigo-400">
-                      Visual Synthesis Core
+                    <div className="inline-flex flex-wrap items-center gap-2">
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-indigo-500 text-white whitespace-nowrap shadow">
+                        Gemini Argon
+                      </span>
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-400">
+                        Visual Synthesis Core
+                      </span>
                     </div>
-                    <div className="text-lg font-bold text-white mt-0.5">
+                    <div className="text-lg font-bold text-white mt-1">
                       Bolt · Visual Engine
                     </div>
                     <div className="text-xs text-[#86868b]">
@@ -1427,7 +1728,7 @@ export function WatchHoneycomb() {
               {/* RIGHT NODE: REAL HUMAN TEACHER SUPERVISOR */}
               <div className="lg:col-span-4 flex flex-col items-center lg:items-end text-center lg:text-right">
                 <div className="flex flex-row lg:flex-row-reverse items-center gap-4">
-                  <div className="relative">
+                  <div className="relative shrink-0">
                     <RiveAvatar
                       rivSrc="/riv/ms-han.riv"
                       state="happy"
@@ -1438,19 +1739,21 @@ export function WatchHoneycomb() {
                       mentorName="Ms. Han"
                       stateMachineName="Character"
                     />
-                    <span className="absolute -bottom-1 right-0 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-400 text-slate-950">
-                      Human Lead
-                    </span>
                   </div>
                   <div>
-                    <span className="inline-block text-[10px] font-bold uppercase tracking-widest text-emerald-400">
-                      Supervisory Loop · Human Educator
-                    </span>
-                    <div className="text-xl font-bold text-white mt-0.5">
+                    <div className="inline-flex flex-wrap items-center lg:justify-end gap-2">
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-400 text-slate-950">
+                        Human Lead
+                      </span>
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">
+                        Supervisory Loop · Human Educator
+                      </span>
+                    </div>
+                    <div className="text-xl font-bold text-white mt-1">
                       Senior Instructor Review
                     </div>
                     <div className="text-xs text-[#86868b]">
-                       spots subtle blind spots & sends deep feedback
+                      spots subtle blind spots & sends deep feedback
                     </div>
                   </div>
                 </div>
@@ -1731,7 +2034,18 @@ export function WatchHoneycomb() {
 
         {/* Minimal Footer */}
         <footer className="max-w-5xl mx-auto px-6 sm:px-10 py-12 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#86868b]">
-          <div className="font-semibold text-[#f5f5f7]">Mentors</div>
+          <button
+            type="button"
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="inline-flex items-center gap-2.5 font-semibold text-sm text-[#f5f5f7] hover:opacity-85 transition-opacity cursor-pointer"
+          >
+            <img
+              src="/logo.png"
+              alt="Mentors Logo"
+              className="w-6 h-6 object-contain shrink-0"
+            />
+            <span>Mentors</span>
+          </button>
           <div>
             Powered by Gemini Argon · Proactive Level Diagnosis · Human-Supervised Mentorship
           </div>
@@ -1777,15 +2091,17 @@ export function WatchHoneycomb() {
                   mentorName={selectedPitchCell.name}
                   stateMachineName="Character"
                 />
-                <span className="absolute -bottom-1 -right-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-emerald-400 text-slate-950 shadow">
-                  Speaking
-                </span>
               </div>
 
               <div className="min-w-0">
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white/5 border border-white/10 text-sky-300 mb-1">
-                  <Sparkles className="w-3 h-3" />
-                  <span>{selectedPitchCell.roleTitle}</span>
+                <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-emerald-400 text-slate-950 shadow">
+                    Speaking
+                  </span>
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white/5 border border-white/10 text-sky-300">
+                    <Sparkles className="w-3 h-3" />
+                    <span>{selectedPitchCell.roleTitle}</span>
+                  </div>
                 </div>
                 <h2 className="text-xl font-black text-white truncate">
                   {selectedPitchCell.name}

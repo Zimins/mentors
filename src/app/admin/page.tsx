@@ -323,6 +323,13 @@ export default function AdminSupervisionPage() {
       <header className="border-b border-white/[0.08] px-8 py-4 flex items-center justify-between">
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2.5">
+            <Link href="/" className="inline-flex items-center gap-2 hover:opacity-85 transition-opacity">
+              <img
+                src="/logo.png"
+                alt="Mentors Logo"
+                className="w-6 h-6 object-contain shrink-0"
+              />
+            </Link>
             <span className="text-base font-bold tracking-tight text-white">Supervision Studio</span>
             <span className="text-[10px] font-semibold tracking-wider px-2 py-0.5 rounded-full bg-white/[0.08] text-slate-300 uppercase">
               Human Expert Co-Pilot

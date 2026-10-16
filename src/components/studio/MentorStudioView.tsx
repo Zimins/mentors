@@ -58,16 +58,7 @@ import {
 
 export interface MentorStudioViewProps {
   mentor: MentorConfig;
-  standaloneTestMode?: boolean;
 }
-
-const RIVE_STATES: { state: RiveAvatarState; label: string }[] = [
-  { state: 'idle', label: 'Idle' },
-  { state: 'thinking', label: 'Think' },
-  { state: 'talking', label: 'Talk' },
-  { state: 'happy', label: 'Happy' },
-  { state: 'sad', label: 'Sad' },
-];
 
 export type ProactiveNudgeType = '3d_pointout' | 'socratic_quiz' | 'real_world_tip';
 
@@ -1245,7 +1236,6 @@ function getDefaultLevelReason(mentor: MentorConfig, level: StudentLevel): strin
 
 export function MentorStudioView({
   mentor: initialMentor,
-  standaloneTestMode = false,
 }: MentorStudioViewProps) {
   const {
     profile,
@@ -1365,28 +1355,11 @@ export function MentorStudioView({
     }, 3200);
   }, []);
 
-  // Ensure every curriculum channel initializes with the Mentor proactively speaking first + an inline JS/HTML Mini-Preview!
+  // Ensure every curriculum channel initializes with the Mentor proactively speaking first (without pre-populated learning materials)
   useEffect(() => {
     if (!activeChannel) return;
     setThreadsByChannel((prev) => {
       if (prev[activeChannel.id]) return prev;
-      const defaultMatType = getDefaultMaterialTypeForChannel(
-        activeChannel.slug,
-        savedLevel
-      );
-      const initialMaterial = buildAdaptiveLearningMaterial({
-        mentorId: activeMentor.id,
-        mentorName: activeMentor.name,
-        roleTitle: activeMentor.roleTitle,
-        subject: activeMentor.subject,
-        accentColor: activeMentor.accentColor,
-        userMessage: activeChannel.title,
-        assessedLevel: savedLevel,
-        materialType: defaultMatType,
-        learningStepTitle: activeChannel.title,
-        scene3d: activeChannel.scene3d,
-        quiz: activeChannel.quiz,
-      });
 
       const initialMsg: ChatMessage = {
         id: `proactive-${activeChannel.id}`,
@@ -1399,8 +1372,6 @@ export function MentorStudioView({
         avatarState: 'talking',
         assessedLevel: savedLevel,
         scene3d: activeChannel.scene3d,
-        recommendedMaterialType: defaultMatType,
-        learningMaterial: initialMaterial,
         proactiveBadge: `Proactive Welcome · #${activeChannel.slug}`,
         suggestedFollowUps: activeChannel.starterPrompts,
         modelUsed: 'gemini-4-argon',
@@ -1412,11 +1383,7 @@ export function MentorStudioView({
           scene3d: activeChannel.scene3d,
           quiz: activeChannel.quiz,
           learningStepTitle: activeChannel.title,
-          keyTakeaways: [
-            activeChannel.summary,
-            '채팅 내 인터랙티브 학습 프리뷰 및 우측 학습 자료 보관함에서 모든 학습 자료를 모아볼 수 있습니다',
-            '파일(📎)을 첨부해 질문하면 멘토가 코스 맥락에 맞춰 분석해 줍니다',
-          ],
+          keyTakeaways: [activeChannel.summary],
         },
       };
     });
@@ -1429,23 +1396,6 @@ export function MentorStudioView({
     if (threadsByChannel[activeChannel.id]) {
       return threadsByChannel[activeChannel.id];
     }
-    const defaultMatType = getDefaultMaterialTypeForChannel(
-      activeChannel.slug,
-      savedLevel
-    );
-    const initialMaterial = buildAdaptiveLearningMaterial({
-      mentorId: activeMentor.id,
-      mentorName: activeMentor.name,
-      roleTitle: activeMentor.roleTitle,
-      subject: activeMentor.subject,
-      accentColor: activeMentor.accentColor,
-      userMessage: activeChannel.title,
-      assessedLevel: savedLevel,
-      materialType: defaultMatType,
-      learningStepTitle: activeChannel.title,
-      scene3d: activeChannel.scene3d,
-      quiz: activeChannel.quiz,
-    });
 
     return {
       messages: [
@@ -1457,8 +1407,6 @@ export function MentorStudioView({
           avatarState: 'talking',
           assessedLevel: savedLevel,
           scene3d: activeChannel.scene3d,
-          recommendedMaterialType: defaultMatType,
-          learningMaterial: initialMaterial,
           proactiveBadge: `Proactive Welcome · #${activeChannel.slug}`,
           suggestedFollowUps: activeChannel.starterPrompts,
           modelUsed: 'gemini-4-argon',
@@ -1469,7 +1417,7 @@ export function MentorStudioView({
       learningStepTitle: activeChannel.title,
       keyTakeaways: [activeChannel.summary],
     };
-  }, [threadsByChannel, activeChannel, activeMentor, savedLevel]);
+  }, [threadsByChannel, activeChannel, savedLevel]);
 
   // Collect all Learning Materials for the Right Sidebar Collection Hub ("학습 자료 보관함")
   const allMentorMaterials = useMemo<CollectedLearningMaterialItem[]>(() => {
@@ -1477,23 +1425,56 @@ export function MentorStudioView({
     for (const ch of curriculumChannels) {
       const thread =
         ch.id === activeChannel.id ? currentThread : threadsByChannel[ch.id];
-      if (!thread) continue;
-      for (const msg of thread.messages) {
-        if (msg.role === 'mentor' && msg.learningMaterial) {
-          items.push({
-            id: `${ch.id}::${msg.id}`,
-            messageId: msg.id,
-            channelId: ch.id,
-            channelSlug: ch.slug,
-            channelTitle: ch.title,
-            timestamp: msg.timestamp,
-            assessedLevel: msg.assessedLevel || assessedLevel,
-            material: msg.learningMaterial,
-            scene3d: msg.scene3d || thread.scene3d || ch.scene3d,
-            quiz: msg.quiz || thread.quiz || ch.quiz,
-            proactiveBadge: msg.proactiveBadge,
-          });
+
+      if (thread) {
+        for (const msg of thread.messages) {
+          if (msg.role === 'mentor' && msg.learningMaterial) {
+            items.push({
+              id: `${ch.id}::${msg.id}`,
+              messageId: msg.id,
+              channelId: ch.id,
+              channelSlug: ch.slug,
+              channelTitle: ch.title,
+              timestamp: msg.timestamp,
+              assessedLevel: msg.assessedLevel || assessedLevel,
+              material: msg.learningMaterial,
+              scene3d: msg.scene3d || thread.scene3d || ch.scene3d,
+              quiz: msg.quiz || thread.quiz || ch.quiz,
+              proactiveBadge: msg.proactiveBadge,
+            });
+          }
         }
+      } else {
+        const chDefaultMatType = getDefaultMaterialTypeForChannel(
+          ch.slug,
+          savedLevel
+        );
+        const chInitialMaterial = buildAdaptiveLearningMaterial({
+          mentorId: activeMentor.id,
+          mentorName: activeMentor.name,
+          roleTitle: activeMentor.roleTitle,
+          subject: activeMentor.subject,
+          accentColor: activeMentor.accentColor,
+          userMessage: ch.title,
+          assessedLevel: savedLevel,
+          materialType: chDefaultMatType,
+          learningStepTitle: ch.title,
+          scene3d: ch.scene3d,
+          quiz: ch.quiz,
+        });
+        items.push({
+          id: `${ch.id}::proactive-${ch.id}`,
+          messageId: `proactive-${ch.id}`,
+          channelId: ch.id,
+          channelSlug: ch.slug,
+          channelTitle: ch.title,
+          timestamp: 'Course Default',
+          assessedLevel: savedLevel,
+          material: chInitialMaterial,
+          scene3d: ch.scene3d,
+          quiz: ch.quiz,
+          proactiveBadge: `Proactive Welcome · #${ch.slug}`,
+        });
       }
     }
     return items.reverse();
@@ -1503,6 +1484,8 @@ export function MentorStudioView({
     currentThread,
     threadsByChannel,
     assessedLevel,
+    savedLevel,
+    activeMentor,
   ]);
 
   const scopedMaterials = useMemo(() => {
@@ -2126,26 +2109,6 @@ export function MentorStudioView({
     }
   };
 
-  const [isRoomTestOpen, setIsRoomTestOpen] = useState<boolean>(standaloneTestMode);
-
-  const handleResetActiveCourseThread = useCallback(() => {
-    setThreadsByChannel((prev) => {
-      const next = { ...prev };
-      delete next[activeChannel.id];
-      return next;
-    });
-    triggerTemporaryAvatarState('talking', 2200);
-  }, [activeChannel.id, triggerTemporaryAvatarState]);
-
-  const handleSimulateStudentLevel = useCallback(
-    (lvl: StudentLevel) => {
-      setAssessedLevel(lvl);
-      setLevelReason(getDefaultLevelReason(activeMentor, lvl));
-      updateMentorLevel(activeMentor.id, lvl);
-    },
-    [activeMentor, updateMentorLevel]
-  );
-
   const activeCustomRivUrl =
     customRivFiles[activeMentor.id] || customRivFiles['global'] || null;
   const currentLevelBadge = LEVEL_BADGE_MAP[assessedLevel];
@@ -2158,6 +2121,16 @@ export function MentorStudioView({
   const [isCrossNudgeLoading, setIsCrossNudgeLoading] = useState(false);
   const [isCrossNudgeVisible, setIsCrossNudgeVisible] = useState(false);
   const nudgeCycleIndexRef = useRef<number>(0);
+
+  const nudgeSenderMentor = useMemo(() => {
+    if (!crossMentorNudge) return MENTORS[1] || MENTORS[0];
+    return (
+      workspaceMentors.find((m) => m.id === crossMentorNudge.fromMentorId) ||
+      MENTORS.find((m) => m.id === crossMentorNudge.fromMentorId) ||
+      MENTORS[1] ||
+      MENTORS[0]
+    );
+  }, [crossMentorNudge, workspaceMentors]);
 
   const triggerCrossMentorNotification = useCallback(
     async (explicitFromMentorId?: string) => {
@@ -2174,6 +2147,15 @@ export function MentorStudioView({
           ? explicitFromMentorId
           : priorityIds[nudgeCycleIndexRef.current % priorityIds.length];
 
+      const targetMentorObj =
+        workspaceMentors.find((m) => m.id === chosenFromId) ||
+        MENTORS.find((m) => m.id === chosenFromId) ||
+        MENTORS.find((m) => m.id !== activeMentor.id) ||
+        MENTORS[0];
+
+      const targetChannels = buildCurriculumForMentor(targetMentorObj);
+      const targetChannel = targetChannels[1] || targetChannels[0];
+
       nudgeCycleIndexRef.current += 1;
       setIsCrossNudgeLoading(true);
 
@@ -2184,9 +2166,16 @@ export function MentorStudioView({
           body: JSON.stringify({
             currentMentorId: activeMentor.id,
             currentMentorName: activeMentor.name,
+            currentSubject: activeMentor.subject,
             currentChannelSlug: activeChannel?.slug,
+            targetMentorId: targetMentorObj.id,
+            targetMentorName: targetMentorObj.name,
+            targetMentorRole: targetMentorObj.roleTitle,
+            targetMentorSubject: targetMentorObj.subject,
+            targetMentorShortTag: targetMentorObj.shortTag,
+            targetChannelSlug: targetChannel?.slug,
+            targetChannelTitle: targetChannel?.title,
             studentLevel: assessedLevel,
-            preferredFromMentorId: chosenFromId,
           }),
         });
         if (res.ok) {
@@ -2200,7 +2189,14 @@ export function MentorStudioView({
         setIsCrossNudgeLoading(false);
       }
     },
-    [activeMentor.id, activeMentor.name, activeChannel?.slug, assessedLevel]
+    [
+      activeMentor.id,
+      activeMentor.name,
+      activeMentor.subject,
+      activeChannel?.slug,
+      assessedLevel,
+      workspaceMentors,
+    ]
   );
 
   // Auto-trigger Cross-Mentor AI Top Notification when entering the Demo / switching mentor room
@@ -2237,11 +2233,11 @@ export function MentorStudioView({
       roleTitle: targetMentor.roleTitle,
       subject: targetMentor.subject,
       accentColor: targetMentor.accentColor,
-      userMessage: `${crossMentorNudge.previousStruggleConcept} — ${crossMentorNudge.notificationText}`,
+      userMessage: `${crossMentorNudge.struggledConcept} — ${crossMentorNudge.bannerMessage}`,
       assessedLevel: targetLevel,
-      materialType: crossMentorNudge.promisedMaterialType,
-      learningStepTitle: `${crossMentorNudge.previousStruggleConcept} (${
-        crossMentorNudge.promisedMaterialType === '3d_preview'
+      materialType: crossMentorNudge.recommendedFormat,
+      learningStepTitle: `${crossMentorNudge.struggledConcept} (${
+        crossMentorNudge.recommendedFormat === '3d_preview'
           ? '맞춤 3D Preview'
           : '맞춤 인터랙티브 미니게임'
       })`,
@@ -2249,15 +2245,16 @@ export function MentorStudioView({
       quiz: matchedChannel.quiz,
     });
 
+    const rewardCandy = crossMentorNudge.candyBonus || 15;
     const welcomeMsgId = `cross-nudge-welcome-${Date.now()}`;
     const welcomeMsg: ChatMessage = {
       id: welcomeMsgId,
       role: 'mentor',
-      text: `🙌 **와줘서 고마워! (${targetMentor.name} · ${targetMentor.shortTag})**\n\n${crossMentorNudge.notificationText}\n\n👇 아래에 너를 위해 새로 준비한 **${
-        crossMentorNudge.promisedMaterialType === '3d_preview'
+      text: `${crossMentorNudge.channelFollowUpMessage || crossMentorNudge.bannerMessage}\n\n👇 아래에 너를 위해 새로 준비한 **${
+        crossMentorNudge.recommendedFormat === '3d_preview'
           ? '인터랙티브 3D Preview'
           : '맞춤 미니게임 (Mini Game)'
-      }** (**${crossMentorNudge.previousStruggleConcept}**)을 바로 띄워뒀어! 직접 조작해보면서 이어서 공부해 보자!`,
+      }** (**${crossMentorNudge.struggledConcept}**)을 바로 띄워뒀어! 직접 조작해보면서 이어서 공부해 보자!`,
       timestamp: new Date().toLocaleTimeString('en-US', {
         hour: '2-digit',
         minute: '2-digit',
@@ -2266,11 +2263,11 @@ export function MentorStudioView({
       assessedLevel: targetLevel,
       scene3d: matchedChannel.scene3d,
       quiz: matchedChannel.quiz,
-      recommendedMaterialType: crossMentorNudge.promisedMaterialType,
+      recommendedMaterialType: crossMentorNudge.recommendedFormat,
       learningMaterial: customMaterial,
-      candyEarned: 15,
+      candyEarned: rewardCandy,
       proactiveBadge: `🔔 상단 알림 초청 수락 · 맞춤 ${
-        crossMentorNudge.promisedMaterialType === '3d_preview'
+        crossMentorNudge.recommendedFormat === '3d_preview'
           ? '3D Preview'
           : 'Mini Game'
       }`,
@@ -2296,8 +2293,8 @@ export function MentorStudioView({
           learningStepTitle: matchedChannel.title,
           keyTakeaways: [
             matchedChannel.summary,
-            `지난번 헷갈렸던 "${crossMentorNudge.previousStruggleConcept}" 맞춤 ${
-              crossMentorNudge.promisedMaterialType === '3d_preview'
+            `지난번 헷갈렸던 "${crossMentorNudge.struggledConcept}" 맞춤 ${
+              crossMentorNudge.recommendedFormat === '3d_preview'
                 ? '3D Preview'
                 : '미니게임'
             } 생성 완료`,
@@ -2307,10 +2304,10 @@ export function MentorStudioView({
     });
 
     setSelectedMaterialId(`${matchedChannel.id}::${welcomeMsgId}`);
-    addCandy(15);
+    addCandy(rewardCandy);
     showCandyNotification(
-      `+15 🍬 ${targetMentor.name} 멘토의 맞춤 ${
-        crossMentorNudge.promisedMaterialType === '3d_preview'
+      `+${rewardCandy} 🍬 ${targetMentor.name} 멘토의 맞춤 ${
+        crossMentorNudge.recommendedFormat === '3d_preview'
           ? '3D Preview'
           : '게임'
       } 세션으로 이동했습니다!`
@@ -2352,10 +2349,14 @@ export function MentorStudioView({
         {/* Back to Apple Watch Home */}
         <Link
           href="/"
-          title="Back to Mentor Honeycomb Home"
+          title="Back to Mentors Home"
           className="w-11 h-11 rounded-2xl bg-white/[0.06] hover:bg-white/[0.14] border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition"
         >
-          <Home className="w-5 h-5" />
+          <img
+            src="/logo.png"
+            alt="Mentors Home"
+            className="w-6 h-6 object-contain"
+          />
         </Link>
 
         <div className="w-8 h-[1px] bg-white/10" />
@@ -2797,38 +2798,38 @@ export function MentorStudioView({
           <div
             role="region"
             aria-label="Cross-Mentor AI Proactive Top Notification"
-            className="mx-4 mt-3 p-3.5 rounded-2xl border shadow-[0_12px_36px_rgba(0,0,0,0.55)] relative overflow-hidden transition-all duration-300"
+            className="mx-4 mt-2 px-3 py-2 rounded-xl border shadow-md relative overflow-hidden transition-all duration-300 shrink-0"
             style={{
-              background: `linear-gradient(135deg, ${crossMentorNudge.fromMentorAccentColor}22 0%, rgba(15, 23, 42, 0.96) 55%, ${crossMentorNudge.fromMentorSecondaryColor}18 100%)`,
-              borderColor: `${crossMentorNudge.fromMentorAccentColor}66`,
+              background: `linear-gradient(135deg, ${nudgeSenderMentor.accentColor}1f 0%, rgba(15, 23, 42, 0.96) 55%, ${nudgeSenderMentor.secondaryColor}14 100%)`,
+              borderColor: `${nudgeSenderMentor.accentColor}55`,
             }}
           >
             {/* Top Animated Glow Line */}
             <div
-              className="absolute top-0 left-0 right-0 h-1"
+              className="absolute top-0 left-0 right-0 h-0.5"
               style={{
-                background: `linear-gradient(90deg, ${crossMentorNudge.fromMentorAccentColor}, ${crossMentorNudge.fromMentorSecondaryColor}, ${crossMentorNudge.fromMentorAccentColor})`,
+                background: `linear-gradient(90deg, ${nudgeSenderMentor.accentColor}, ${nudgeSenderMentor.secondaryColor}, ${nudgeSenderMentor.accentColor})`,
               }}
             />
 
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-              {/* Left: Sending Mentor Avatar + AI Situation Badge + Message */}
-              <div className="flex items-start gap-3 min-w-0">
+            <div className="flex items-center justify-between gap-2.5">
+              {/* Left: Compact Sending Mentor Avatar + 2-Line Clamped Message */}
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
                 <div className="relative shrink-0">
                   <RiveAvatar
                     key={`cross-nudge-avatar-${crossMentorNudge.fromMentorId}`}
-                    rivSrc={crossMentorNudge.fromMentorRivFile}
+                    rivSrc={nudgeSenderMentor.rivFile}
                     state="happy"
-                    accentColor={crossMentorNudge.fromMentorAccentColor}
-                    secondaryColor={crossMentorNudge.fromMentorSecondaryColor}
-                    size={52}
+                    accentColor={nudgeSenderMentor.accentColor}
+                    secondaryColor={nudgeSenderMentor.secondaryColor}
+                    size={36}
                     mentorName={crossMentorNudge.fromMentorName}
                     stateMachineName="Character"
                   />
                   <span
-                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black text-slate-950 shadow"
+                    className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-black text-slate-950 shadow"
                     style={{
-                      backgroundColor: crossMentorNudge.fromMentorAccentColor,
+                      backgroundColor: nudgeSenderMentor.accentColor,
                     }}
                     title="타 멘토 상단 알림"
                   >
@@ -2837,58 +2838,54 @@ export function MentorStudioView({
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                  <div className="flex items-center gap-1.5 mb-0.5 overflow-hidden">
                     <span
-                      className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full text-slate-950"
+                      className="shrink-0 text-[10px] font-black px-1.5 py-0.2 rounded-full text-slate-950"
                       style={{
-                        backgroundColor: crossMentorNudge.fromMentorAccentColor,
+                        backgroundColor: nudgeSenderMentor.accentColor,
                       }}
                     >
-                      🔔 타 멘토 상단 알림 · {crossMentorNudge.fromMentorName} (
-                      {crossMentorNudge.fromMentorShortTag})
+                      {crossMentorNudge.fromMentorName} · {crossMentorNudge.fromMentorShortTag}
                     </span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/10 text-sky-200 border border-sky-400/30">
-                      🤖 AI 상황 판단: {crossMentorNudge.aiSituationSummary}
+                    <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-200 border border-amber-400/30">
+                      {crossMentorNudge.recommendedFormat === '3d_preview'
+                        ? '🧊 3D Preview'
+                        : '🎮 미니게임'}
                     </span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-200 border border-amber-400/35">
-                      {crossMentorNudge.promisedMaterialType === '3d_preview'
-                        ? '🧊 맞춤 3D Preview 제작 완료'
-                        : '🎮 맞춤 미니게임 제작 완료'}
+                    <span className="text-[10px] text-slate-400 truncate">
+                      #{crossMentorNudge.targetChannelSlug} · {crossMentorNudge.struggledConcept}
                     </span>
                   </div>
 
-                  <p className="text-xs sm:text-[13px] font-semibold text-white leading-relaxed">
-                    {crossMentorNudge.notificationText}
-                  </p>
-                  <p className="text-[11px] text-slate-300 mt-1">
-                    💡 지난번 어려워했던 주제:{' '}
-                    <span className="font-bold text-amber-300">
-                      {crossMentorNudge.previousStruggleConcept}
-                    </span>{' '}
-                    → 채널{' '}
-                    <span className="font-mono text-sky-300">
-                      #{crossMentorNudge.targetChannelSlug}
-                    </span>
+                  <p
+                    className="text-xs font-medium text-slate-100 leading-snug line-clamp-2 break-keep"
+                    title={crossMentorNudge.bannerMessage}
+                  >
+                    {crossMentorNudge.bannerMessage}
                   </p>
                 </div>
               </div>
 
-              {/* Right: Action Buttons (Switch to Mentor & Open 3D Preview/Game, Cycle Another Mentor, Dismiss) */}
-              <div className="flex items-center gap-2 shrink-0 self-end lg:self-center">
+              {/* Right: Compact Action Buttons */}
+              <div className="flex items-center gap-1.5 shrink-0">
                 <button
                   type="button"
                   onClick={handleAcceptCrossMentorNudge}
-                  className="px-3.5 py-2 rounded-xl text-xs font-black text-slate-950 transition transform hover:scale-[1.02] cursor-pointer shadow-lg flex items-center gap-1.5"
+                  className="px-2.5 py-1.5 rounded-lg text-[11px] font-black text-slate-950 transition hover:opacity-95 cursor-pointer shadow flex items-center gap-1"
                   style={{
-                    background: `linear-gradient(135deg, ${crossMentorNudge.fromMentorAccentColor}, ${crossMentorNudge.fromMentorSecondaryColor})`,
+                    background: `linear-gradient(135deg, ${nudgeSenderMentor.accentColor}, ${nudgeSenderMentor.secondaryColor})`,
                   }}
                 >
-                  {crossMentorNudge.promisedMaterialType === '3d_preview' ? (
-                    <Box className="w-3.5 h-3.5" />
+                  {crossMentorNudge.recommendedFormat === '3d_preview' ? (
+                    <Box className="w-3 h-3" />
                   ) : (
-                    <Gamepad2 className="w-3.5 h-3.5" />
+                    <Gamepad2 className="w-3 h-3" />
                   )}
-                  <span>{crossMentorNudge.ctaLabel}</span>
+                  <span className="whitespace-nowrap">
+                    {crossMentorNudge.recommendedFormat === '3d_preview'
+                      ? '3D 열기'
+                      : '게임 열기'}
+                  </span>
                 </button>
 
                 <button
@@ -2896,23 +2893,22 @@ export function MentorStudioView({
                   onClick={() => triggerCrossMentorNotification()}
                   disabled={isCrossNudgeLoading}
                   title="다른 멘토의 AI 상단 알림 보기"
-                  className="px-2.5 py-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.15] border border-white/15 text-[11px] font-bold text-slate-200 transition cursor-pointer flex items-center gap-1"
+                  className="p-1.5 rounded-lg bg-white/[0.07] hover:bg-white/[0.14] border border-white/10 text-slate-300 transition cursor-pointer"
                 >
                   <RefreshCw
-                    className={`w-3.5 h-3.5 ${
+                    className={`w-3 h-3 ${
                       isCrossNudgeLoading ? 'animate-spin text-sky-400' : ''
                     }`}
                   />
-                  <span className="hidden sm:inline">다른 멘토</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setIsCrossNudgeVisible(false)}
                   title="상단 알림 닫기"
-                  className="p-1.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.12] text-slate-400 hover:text-white transition cursor-pointer"
+                  className="p-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.12] text-slate-400 hover:text-white transition cursor-pointer"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
@@ -3047,7 +3043,7 @@ export function MentorStudioView({
                                 {att.name}
                               </span>
                               <span className="text-[10px] font-mono text-slate-400 shrink-0">
-                                ({formatFileSize(att.size)})
+                                ({formatFileSize(att.sizeBytes)})
                               </span>
                             </div>
                             <p className="text-[10px] text-sky-300/90 mt-0.5">
@@ -3093,7 +3089,7 @@ export function MentorStudioView({
                         <button
                           type="button"
                           onClick={() => {
-                            setSelectedMaterialId(msg.id);
+                            setSelectedMaterialId(`${activeChannel.id}::${msg.id}`);
                             setIsMobileLabOpen(true);
                           }}
                           className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-300 hover:text-sky-200 px-2.5 py-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 border border-sky-400/25 transition cursor-pointer"
@@ -3289,7 +3285,7 @@ export function MentorStudioView({
                     {att.name}
                   </span>
                   <span className="text-[10px] font-mono text-slate-300">
-                    {formatFileSize(att.size)}
+                    {formatFileSize(att.sizeBytes)}
                   </span>
                   <button
                     type="button"
@@ -3599,10 +3595,13 @@ export function MentorStudioView({
                       }`}
                     >
                       <span
-                        className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[10px] font-extrabold ${meta.badgeClass}`}
+                        className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[10px] font-extrabold text-slate-950"
+                        style={{
+                          backgroundColor: meta.badgeColor,
+                          borderColor: meta.badgeColor,
+                        }}
                       >
-                        {meta.icon}
-                        <span>{meta.koreanHint}</span>
+                        <span>{meta.shortLabel}</span>
                       </span>
 
                       <div className="min-w-0 flex-1">
@@ -3620,7 +3619,7 @@ export function MentorStudioView({
                           </span>
                           <span className="text-[10px] text-slate-500">·</span>
                           <p className="text-[10px] text-slate-400 truncate">
-                            {item.material.reason}
+                            {item.material.pedagogicalReason}
                           </p>
                         </div>
                       </div>
@@ -3717,25 +3716,25 @@ export function MentorStudioView({
               <div className="space-y-1.5">
                 {uploadedFilesInScope.map((fileItem) => (
                   <div
-                    key={fileItem.id}
+                    key={fileItem.attachment.id}
                     className="p-2.5 rounded-xl bg-slate-900/75 border border-white/[0.08] space-y-1.5"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
                         <FileText className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                         <span className="text-xs font-bold text-white truncate">
-                          {fileItem.name}
+                          {fileItem.attachment.name}
                         </span>
                       </div>
                       <span className="text-[10px] font-mono text-slate-400 shrink-0">
-                        {formatFileSize(fileItem.size)}
+                        {formatFileSize(fileItem.attachment.sizeBytes)}
                       </span>
                     </div>
 
-                    {fileItem.textContent && (
+                    {fileItem.attachment.textContent && (
                       <pre className="text-[10px] text-slate-300 bg-slate-950/80 border border-white/[0.06] rounded-lg p-2 max-h-24 overflow-y-auto whitespace-pre-wrap font-mono">
-                        {fileItem.textContent.slice(0, 360)}
-                        {fileItem.textContent.length > 360 ? '...' : ''}
+                        {fileItem.attachment.textContent.slice(0, 360)}
+                        {fileItem.attachment.textContent.length > 360 ? '...' : ''}
                       </pre>
                     )}
 
@@ -3748,7 +3747,7 @@ export function MentorStudioView({
                         disabled={isLoading}
                         onClick={() =>
                           handleSendMessage(
-                            `업로드한 파일 "${fileItem.name}"의 핵심 개념을 #${activeChannel.slug} 코스와 연결해서 요약하고 퀴즈나 미니게임으로 만들어줘!`,
+                            `업로드한 파일 "${fileItem.attachment.name}"의 핵심 개념을 #${activeChannel.slug} 코스와 연결해서 요약하고 퀴즈나 미니게임으로 만들어줘!`,
                             selectedMaterialMode
                           )
                         }
