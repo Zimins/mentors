@@ -9,10 +9,17 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { ShopItem, StudentLevel, UserProfileState } from '@/types/mentor';
+import {
+  MentorConfig,
+  ShopItem,
+  StudentLevel,
+  UserProfileState,
+} from '@/types/mentor';
 
 const LOCAL_STORAGE_KEY = 'mentors_user_profile_v1';
 const ANON_SESSION_STORAGE_KEY = 'mentors_anon_session_v1';
+export const BROWSER_CUSTOM_MENTORS_STORAGE_KEY =
+  'mentors_browser_custom_mentors_v1';
 
 function createAnonymousIdentity(): { userId: string; displayName: string } {
   const randomHex =
@@ -62,6 +69,9 @@ export interface UserProgressContextValue {
   resetAnonymousSession: () => void;
   customRivFiles: Record<string, string>;
   setCustomRivFile: (mentorIdOrGlobal: string, blobUrl: string) => void;
+  customMentors: MentorConfig[];
+  saveCustomMentor: (mentor: MentorConfig) => void;
+  deleteCustomMentor: (mentorId: string) => void;
   isShopOpen: boolean;
   setIsShopOpen: (open: boolean) => void;
 }
@@ -82,6 +92,7 @@ export function UserProgressProvider({
   const [customRivFiles, setCustomRivFiles] = useState<Record<string, string>>(
     {}
   );
+  const [customMentors, setCustomMentors] = useState<MentorConfig[]>([]);
   const [isShopOpen, setIsShopOpen] = useState<boolean>(false);
   const [toasts, setToasts] = useState<CandyToastItem[]>([]);
   const hydratedRef = useRef(false);
@@ -174,6 +185,21 @@ export function UserProgressProvider({
       };
       localLoaded = seededAnonProfile;
       setProfile(seededAnonProfile);
+    }
+
+    // Load browser-only custom mentors from localStorage (never synced to server)
+    try {
+      const rawCustom = window.localStorage.getItem(
+        BROWSER_CUSTOM_MENTORS_STORAGE_KEY
+      );
+      if (rawCustom) {
+        const parsedCustom = JSON.parse(rawCustom);
+        if (Array.isArray(parsedCustom)) {
+          setCustomMentors(parsedCustom);
+        }
+      }
+    } catch {
+      // Ignore parse errors
     }
 
     const activeUserId = localLoaded.userId;
@@ -431,6 +457,43 @@ export function UserProgressProvider({
     []
   );
 
+  const saveCustomMentor = useCallback((mentor: MentorConfig) => {
+    setCustomMentors((prev) => {
+      const next = [
+        { ...mentor, isCustom: true, createdAt: mentor.createdAt || new Date().toISOString() },
+        ...prev.filter((m) => m.id !== mentor.id),
+      ];
+      try {
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(
+            BROWSER_CUSTOM_MENTORS_STORAGE_KEY,
+            JSON.stringify(next)
+          );
+        }
+      } catch {
+        // Ignore storage quota errors
+      }
+      return next;
+    });
+  }, []);
+
+  const deleteCustomMentor = useCallback((mentorId: string) => {
+    setCustomMentors((prev) => {
+      const next = prev.filter((m) => m.id !== mentorId);
+      try {
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(
+            BROWSER_CUSTOM_MENTORS_STORAGE_KEY,
+            JSON.stringify(next)
+          );
+        }
+      } catch {
+        // Ignore storage errors
+      }
+      return next;
+    });
+  }, []);
+
   const value = useMemo<UserProgressContextValue>(
     () => ({
       profile,
@@ -445,6 +508,9 @@ export function UserProgressProvider({
       resetAnonymousSession,
       customRivFiles,
       setCustomRivFile,
+      customMentors,
+      saveCustomMentor,
+      deleteCustomMentor,
       isShopOpen,
       setIsShopOpen,
     }),
@@ -460,7 +526,11 @@ export function UserProgressProvider({
       resetAnonymousSession,
       customRivFiles,
       setCustomRivFile,
+      customMentors,
+      saveCustomMentor,
+      deleteCustomMentor,
       isShopOpen,
+      setIsShopOpen,
     ]
   );
 

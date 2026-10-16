@@ -985,17 +985,42 @@ function buildCurriculumForMentor(mentor: MentorConfig): CurriculumChannel[] {
     ],
   };
 
+  const customSlugs =
+    mentor.customChannels && mentor.customChannels.length >= 4
+      ? mentor.customChannels
+      : [
+          '01-foundations-and-diagnosis',
+          '02-spatial-3d-architecture',
+          '03-bottlenecks-and-edge-cases',
+          '04-mastery-boss-challenge',
+        ];
+
+  const humanizeSlug = (slug: string, fallbackSuffix: string) => {
+    const withoutPrefix = slug.replace(/^\d+[-_]?/, '').trim();
+    if (!withoutPrefix) return `${mentor.shortTag} — ${fallbackSuffix}`;
+    const words = withoutPrefix
+      .split(/[-_]+/)
+      .filter(Boolean)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1));
+    return `${mentor.shortTag} — ${words.join(' ')}`;
+  };
+
   const fallbackTemplates: ChannelTemplateSpec[] = [
     {
-      slug: '01-foundations-and-diagnosis',
-      title: `${mentor.shortTag} — Core Foundations & Level Check`,
+      slug: customSlugs[0],
+      title: mentor.customChannels?.[0]
+        ? humanizeSlug(customSlugs[0], 'Core Foundations & Level Check')
+        : `${mentor.shortTag} — Core Foundations & Level Check`,
       summary: `Build rock-solid spatial intuition for ${mentor.subject} and calibrate your starting level.`,
-      greeting: `Hi! I'm **${mentor.name}** (${mentor.roleTitle})! 👋 Welcome to **#01-foundations-and-diagnosis**. Check out **${primaryNode}** and **${secondaryNode}** in our **${mentor.subject}** 3D model on the right. Tell me a bit about your background, or click a prompt below so I can tailor this course to you!`,
-      prompts: [
-        `Diagnose my level in ${mentor.subject} with a quick warm-up!`,
-        `Explain the 3D model for ${mentor.shortTag} using an everyday analogy.`,
-        `Give me a Beginner-friendly quiz to earn my first Candy!`,
-      ],
+      greeting: `Hi! I'm **${mentor.name}** (${mentor.roleTitle})! 👋 Welcome to **#${customSlugs[0]}**. Check out **${primaryNode}** and **${secondaryNode}** in our **${mentor.subject}** 3D model on the right. Tell me a bit about your background, or click a prompt below so I can tailor this course to you!`,
+      prompts:
+        mentor.starterPrompts && mentor.starterPrompts.length >= 3
+          ? mentor.starterPrompts.slice(0, 3)
+          : [
+              `Diagnose my level in ${mentor.subject} with a quick warm-up!`,
+              `Explain the 3D model for ${mentor.shortTag} using an everyday analogy.`,
+              `Give me a Beginner-friendly quiz to earn my first Candy!`,
+            ],
       nodeColors: [mentor.accentColor, mentor.secondaryColor, '#34d399'],
       quizQ: `When exploring ${mentor.subject} in this channel, how do the 3D nodes and animated packets help you learn?`,
       quizOpts: [
@@ -1008,10 +1033,12 @@ function buildCurriculumForMentor(mentor: MentorConfig): CurriculumChannel[] {
       quizExp: `Spatial 3D visualization turns abstract ${mentor.subject} relationships into concrete mental models you can rotate and inspect!`,
     },
     {
-      slug: '02-spatial-3d-architecture',
-      title: `${mentor.shortTag} — Deep 3D Architecture`,
+      slug: customSlugs[1],
+      title: mentor.customChannels?.[1]
+        ? humanizeSlug(customSlugs[1], 'Deep 3D Architecture')
+        : `${mentor.shortTag} — Deep 3D Architecture`,
       summary: `Inspect internal state transitions, vector flows, and structural trade-offs in 3D.`,
-      greeting: `Welcome to **#02-spatial-3d-architecture**! 🚀 In this curriculum channel, we zoom inside the core engine of **${mentor.subject}**. Notice how packets flow between **${primaryNode}** and **${secondaryNode}** in the 3D viewer—which part of this pipeline looks most intriguing to you?`,
+      greeting: `Welcome to **#${customSlugs[1]}**! 🚀 In this curriculum channel, we zoom inside the core engine of **${mentor.subject}**. Notice how packets flow between **${primaryNode}** and **${secondaryNode}** in the 3D viewer—which part of this pipeline looks most intriguing to you?`,
       prompts: [
         `Break down each node in this ${mentor.shortTag} 3D architecture!`,
         `What happens if ${primaryNode} in this 3D model becomes a bottleneck?`,
@@ -1030,13 +1057,15 @@ function buildCurriculumForMentor(mentor: MentorConfig): CurriculumChannel[] {
         'Modular node boundaries allow each stage to scale, optimize, and recover independently while maintaining clean interfaces.',
     },
     {
-      slug: '03-bottlenecks-and-edge-cases',
-      title: `${mentor.shortTag} — Bottlenecks & Edge Cases`,
+      slug: customSlugs[2],
+      title: mentor.customChannels?.[2]
+        ? humanizeSlug(customSlugs[2], 'Bottlenecks & Edge Cases')
+        : `${mentor.shortTag} — Bottlenecks & Edge Cases`,
       summary: `Stress-test failure modes, performance limits, and real-world optimization tricks.`,
-      greeting: `Hey! Glad to see you in **#03-bottlenecks-and-edge-cases**! 🔍 Real mastery in **${mentor.subject}** comes from knowing where systems break under pressure. Want me to simulate a high-load edge case in our 3D viewer right now?`,
+      greeting: `Hey! Glad to see you in **#${customSlugs[2]}**! 🔍 Real mastery in **${mentor.subject}** comes from knowing where systems break under pressure. Want me to simulate a high-load edge case in our 3D viewer right now?`,
       prompts: [
         `Show me a 3D bottleneck scenario in ${mentor.subject} and how to fix it!`,
-        `What is the #1 mistake engineers make in ${mentor.shortTag}?`,
+        `What is the #1 mistake learners make in ${mentor.shortTag}?`,
         `Test me with a tricky edge-case Candy quiz!`,
       ],
       nodeColors: ['#f43f5e', '#f59e0b', mentor.accentColor],
@@ -1052,10 +1081,12 @@ function buildCurriculumForMentor(mentor: MentorConfig): CurriculumChannel[] {
         'Amdahl’s Law and critical-path analysis show that optimizing the highest-contention hub node yields the largest end-to-end speedup.',
     },
     {
-      slug: '04-mastery-boss-challenge',
-      title: `${mentor.shortTag} — Advanced Boss Challenge`,
+      slug: customSlugs[3],
+      title: mentor.customChannels?.[3]
+        ? humanizeSlug(customSlugs[3], 'Advanced Boss Challenge')
+        : `${mentor.shortTag} — Advanced Boss Challenge`,
       summary: `Synthesize everything you've learned with advanced 3D scenarios and high-reward Candy quizzes.`,
-      greeting: `Welcome to **#04-mastery-boss-challenge**! 🏆 Ready to put your **${mentor.subject}** intuition to the ultimate test? Tell me when you're ready and I'll generate an Advanced 3D puzzle and a **+35 🍬 Candy** boss quiz!`,
+      greeting: `Welcome to **#${customSlugs[3]}**! 🏆 Ready to put your **${mentor.subject}** intuition to the ultimate test? Tell me when you're ready and I'll generate an Advanced 3D puzzle and a **+35 🍬 Candy** boss quiz!`,
       prompts: [
         `Launch the Advanced ${mentor.shortTag} 3D Boss Challenge!`,
         `Ask me an Olympiad / Staff-level design question on ${mentor.subject}!`,
@@ -1237,7 +1268,7 @@ function getDefaultLevelReason(mentor: MentorConfig, level: StudentLevel): strin
 }
 
 export function MentorStudioView({
-  mentor: initialMentor,
+  mentor: routeMentor,
 }: MentorStudioViewProps) {
   const {
     profile,
@@ -1245,19 +1276,36 @@ export function MentorStudioView({
     updateMentorLevel,
     markQuizCompleted,
     customRivFiles,
+    customMentors,
     setIsShopOpen,
   } = useUserProgress();
 
-  // Slack Workspace Rail: All mentors available to switch on the far-left rail, preserving any custom overrides on initialMentor
+  // Resolve browser-stored custom mentor config if this mentor was created in browser localStorage
+  const initialMentor = useMemo(() => {
+    const savedCustom = customMentors.find((m) => m.id === routeMentor.id);
+    return savedCustom || routeMentor;
+  }, [customMentors, routeMentor]);
+
+  // Slack Workspace Rail: All mentors available to switch on the far-left rail, including browser-local customMentors
   const workspaceMentors = useMemo(() => {
-    const exists = MENTORS.some((m) => m.id === initialMentor.id);
-    if (exists) {
-      return MENTORS.map((m) => (m.id === initialMentor.id ? initialMentor : m));
+    const mergedMap = new Map<string, MentorConfig>();
+    if (!MENTORS.some((m) => m.id === initialMentor.id)) {
+      mergedMap.set(initialMentor.id, initialMentor);
     }
-    return [initialMentor, ...MENTORS];
-  }, [initialMentor]);
+    for (const cm of customMentors) {
+      mergedMap.set(cm.id, cm.id === initialMentor.id ? initialMentor : cm);
+    }
+    for (const m of MENTORS) {
+      mergedMap.set(m.id, m.id === initialMentor.id ? initialMentor : m);
+    }
+    return Array.from(mergedMap.values());
+  }, [initialMentor, customMentors]);
 
   const [activeMentor, setActiveMentor] = useState<MentorConfig>(initialMentor);
+  const [hoveredRailMentor, setHoveredRailMentor] = useState<{
+    mentor: MentorConfig;
+    centerY: number;
+  } | null>(null);
 
   // Build Curriculum Channels for each mentor (Slack Channels sidebar)
   const [customChannelsByMentor, setCustomChannelsByMentor] = useState<
@@ -1276,7 +1324,7 @@ export function MentorStudioView({
     () => buildCurriculumForMentor(initialMentor)[0].id
   );
 
-  // Sync if initialMentor prop changes via route navigation
+  // Sync if initialMentor prop or browser customMentors hydrate/change
   useEffect(() => {
     setActiveMentor(initialMentor);
     const chs = buildCurriculumForMentor(initialMentor);
@@ -2304,7 +2352,10 @@ export function MentorStudioView({
         <div className="w-8 h-[1px] bg-white/10" />
 
         {/* Scrollable Mentor Face Icons (Slack Workspace Switcher) */}
-        <div className="flex-1 w-full overflow-y-auto flex flex-col items-center gap-3 py-1 no-scrollbar">
+        <div
+          onScroll={() => setHoveredRailMentor(null)}
+          className="flex-1 w-full overflow-y-auto flex flex-col items-center gap-3 py-1 no-scrollbar"
+        >
           {workspaceMentors.map((m) => {
             const isActive = m.id === activeMentor.id;
             return (
@@ -2327,7 +2378,15 @@ export function MentorStudioView({
                 <button
                   type="button"
                   onClick={() => handleSelectWorkspaceMentor(m)}
-                  title={`${m.name} (${m.roleTitle} · ${m.shortTag})`}
+                  onMouseEnter={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setHoveredRailMentor({
+                      mentor: m,
+                      centerY: rect.top + rect.height / 2,
+                    });
+                  }}
+                  onMouseLeave={() => setHoveredRailMentor(null)}
+                  aria-label={`${m.name} (${m.shortTag})`}
                   className={`relative rounded-2xl p-0.5 transition-all duration-200 cursor-pointer ${
                     isActive
                       ? 'ring-2 ring-white scale-105'
@@ -2351,11 +2410,41 @@ export function MentorStudioView({
                       backgroundColor: isActive ? '#34d399' : m.accentColor,
                     }}
                   />
+                  {/* Subtle bottom specialty tag on hover */}
+                  <span
+                    className="pointer-events-none absolute -bottom-2 left-1/2 -translate-x-1/2 px-1.5 py-0.2 rounded-full bg-slate-950/95 border border-white/20 text-[8px] font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-20 shadow"
+                    style={{ color: m.accentColor }}
+                  >
+                    {m.shortTag}
+                  </span>
                 </button>
               </div>
             );
           })}
         </div>
+
+        {/* Subtle Floating Specialty Pill next to Hovered Rail Mentor */}
+        {hoveredRailMentor && (
+          <div
+            style={{ top: hoveredRailMentor.centerY }}
+            className="pointer-events-none fixed left-[68px] -translate-y-1/2 z-50 flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-950/95 border border-white/15 shadow-[0_8px_24px_rgba(0,0,0,0.85)] backdrop-blur-md animate-in fade-in zoom-in-95 duration-150"
+          >
+            <span
+              className="w-1.5 h-1.5 rounded-full shrink-0"
+              style={{ backgroundColor: hoveredRailMentor.mentor.accentColor }}
+            />
+            <span className="text-[11px] font-bold text-white whitespace-nowrap">
+              {hoveredRailMentor.mentor.name}
+            </span>
+            <span className="text-slate-600 text-[10px]">·</span>
+            <span
+              className="text-[11px] font-semibold whitespace-nowrap"
+              style={{ color: hoveredRailMentor.mentor.accentColor }}
+            >
+              {hoveredRailMentor.mentor.shortTag}
+            </span>
+          </div>
+        )}
 
         {/* Bottom Candy Shop Shortcut */}
         <button
@@ -2407,19 +2496,27 @@ export function MentorStudioView({
           />
 
           <div className="flex items-start gap-3">
-            <RiveAvatar
-              key={`profile-avatar-${activeMentor.id}-${activeMentor.rivFile}`}
-              rivSrc={activeMentor.rivFile}
-              customRivBlobUrl={activeCustomRivUrl}
-              state={avatarState}
-              accentColor={activeMentor.accentColor}
-              secondaryColor={activeMentor.secondaryColor}
-              equippedSkinId={profile.equippedSkinId}
-              equippedAuraId={profile.equippedAuraId}
-              size={56}
-              mentorName={activeMentor.name}
-              stateMachineName="Character"
-            />
+            <div className="relative shrink-0 group/profile-avatar">
+              <RiveAvatar
+                key={`profile-avatar-${activeMentor.id}-${activeMentor.rivFile}`}
+                rivSrc={activeMentor.rivFile}
+                customRivBlobUrl={activeCustomRivUrl}
+                state={avatarState}
+                accentColor={activeMentor.accentColor}
+                secondaryColor={activeMentor.secondaryColor}
+                equippedSkinId={profile.equippedSkinId}
+                equippedAuraId={profile.equippedAuraId}
+                size={56}
+                mentorName={activeMentor.name}
+                stateMachineName="Character"
+              />
+              <span
+                className="pointer-events-none absolute -bottom-1.5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-slate-950/95 border border-white/20 text-[9px] font-bold whitespace-nowrap opacity-0 group-hover/profile-avatar:opacity-100 transition-opacity duration-150 z-20 shadow-md"
+                style={{ color: activeMentor.accentColor }}
+              >
+                {activeMentor.shortTag}
+              </span>
+            </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
                 <h2 className="text-base font-black text-white truncate">
@@ -2862,17 +2959,25 @@ export function MentorStudioView({
           {/* Channel Intro Banner */}
           <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.07] flex items-center justify-between gap-3.5">
             <div className="flex items-center gap-3.5 min-w-0">
-              <RiveAvatar
-                key={`banner-${activeMentor.id}-${activeMentor.rivFile}`}
-                rivSrc={activeMentor.rivFile}
-                customRivBlobUrl={activeCustomRivUrl}
-                state={avatarState}
-                accentColor={activeMentor.accentColor}
-                secondaryColor={activeMentor.secondaryColor}
-                size={54}
-                mentorName={activeMentor.name}
-                stateMachineName="Character"
-              />
+              <div className="relative shrink-0 group/banner-avatar">
+                <RiveAvatar
+                  key={`banner-${activeMentor.id}-${activeMentor.rivFile}`}
+                  rivSrc={activeMentor.rivFile}
+                  customRivBlobUrl={activeCustomRivUrl}
+                  state={avatarState}
+                  accentColor={activeMentor.accentColor}
+                  secondaryColor={activeMentor.secondaryColor}
+                  size={54}
+                  mentorName={activeMentor.name}
+                  stateMachineName="Character"
+                />
+                <span
+                  className="pointer-events-none absolute -bottom-1.5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-slate-950/95 border border-white/20 text-[9px] font-bold whitespace-nowrap opacity-0 group-hover/banner-avatar:opacity-100 transition-opacity duration-150 z-20 shadow-md"
+                  style={{ color: activeMentor.accentColor }}
+                >
+                  {activeMentor.shortTag}
+                </span>
+              </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs font-extrabold text-white">
@@ -2903,7 +3008,7 @@ export function MentorStudioView({
             return (
               <div key={msg.id} className="flex items-start gap-3.5 group">
                 {isMentor ? (
-                  <div className="shrink-0 mt-0.5">
+                  <div className="relative shrink-0 mt-0.5 group/msg-avatar">
                     <RiveAvatar
                       key={`msg-${activeMentor.id}-${msg.id}`}
                       rivSrc={activeMentor.rivFile}
@@ -2922,6 +3027,12 @@ export function MentorStudioView({
                       mentorName={activeMentor.name}
                       stateMachineName="Character"
                     />
+                    <span
+                      className="pointer-events-none absolute -bottom-1.5 left-1/2 -translate-x-1/2 px-1.5 py-0.2 rounded-full bg-slate-950/95 border border-white/20 text-[8px] font-bold whitespace-nowrap opacity-0 group-hover/msg-avatar:opacity-100 transition-opacity duration-150 z-20 shadow-md"
+                      style={{ color: activeMentor.accentColor }}
+                    >
+                      {activeMentor.shortTag}
+                    </span>
                   </div>
                 ) : (
                   <div className="w-[42px] h-[42px] rounded-full bg-indigo-500/20 border border-indigo-400/40 flex items-center justify-center text-xs font-black text-indigo-200 shrink-0 mt-0.5">
