@@ -17,6 +17,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
+      <head>
+        <link
+          rel="preload"
+          href="/riv/rive.wasm"
+          as="fetch"
+          type="application/wasm"
+          crossOrigin="anonymous"
+        />
+      </head>
       <body className="min-h-screen bg-[#060913] text-slate-100 antialiased selection:bg-sky-500/30 selection:text-sky-200">
         <UserProgressProvider>
           <div className="relative flex min-h-screen flex-col">

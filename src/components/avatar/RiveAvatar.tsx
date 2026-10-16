@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useEffect, useId, useState } from 'react';
+import React, { useEffect, useId, useMemo, useState } from 'react';
 import {
   useRive,
   Layout,
   Fit,
   Alignment,
   StateMachineInputType,
+  RuntimeLoader,
 } from '@rive-app/react-canvas';
 import { RiveAvatarState } from '@/types/mentor';
 
@@ -24,6 +25,8 @@ export interface RiveAvatarProps {
   stateMachineName?: string;
   discBackground?: string;
   className?: string;
+  /** Optional stagger delay (ms) when mounting dozens of avatars at once */
+  loadDelayMs?: number;
   onStateClick?: (nextState: RiveAvatarState) => void;
 }
 
@@ -50,29 +53,83 @@ const SIZE_MAP: Record<'sm' | 'md' | 'lg' | 'xl', number> = {
   xl: 184,
 };
 
-// Cache probed .riv URLs across instances so bubbles don't re-probe repeatedly
-const rivProbeCache = new Map<string, boolean>();
+const CORE_RIV_FILES = [
+  '/riv/jun.riv',
+  '/riv/mina.riv',
+  '/riv/bolt.riv',
+  '/riv/ms-han.riv',
+  '/riv/coach-pen.riv',
+  '/riv/sora.riv',
+  '/riv/nabi.riv',
+  '/riv/mong.riv',
+];
 
-async function checkRivExists(url: string): Promise<boolean> {
-  if (!url) return false;
-  if (url.startsWith('blob:') || url.startsWith('data:')) return true;
-  if (rivProbeCache.has(url)) {
-    return rivProbeCache.get(url)!;
+const AVATAR_RIVE_LAYOUT = new Layout({
+  fit: Fit.Contain,
+  alignment: Alignment.Center,
+});
+
+// Shared in-memory ArrayBuffer + in-flight Promise caches so each .riv file is fetched only ONCE
+const rivBufferCache = new Map<string, ArrayBuffer | null>();
+const rivBufferPromiseCache = new Map<string, Promise<ArrayBuffer | null>>();
+
+export function fetchRivBuffer(url: string): Promise<ArrayBuffer | null> {
+  if (!url) return Promise.resolve(null);
+  if (rivBufferCache.has(url)) {
+    return Promise.resolve(rivBufferCache.get(url)!);
   }
+  const existing = rivBufferPromiseCache.get(url);
+  if (existing) {
+    return existing;
+  }
+
+  const promise = fetch(url, { cache: 'force-cache' })
+    .then(async (res) => {
+      const contentType = res.headers.get('content-type') || '';
+      if (!res.ok || contentType.includes('text/html')) {
+        rivBufferCache.set(url, null);
+        return null;
+      }
+      const buf = await res.arrayBuffer();
+      if (buf.byteLength < 16) {
+        rivBufferCache.set(url, null);
+        return null;
+      }
+      rivBufferCache.set(url, buf);
+      return buf;
+    })
+    .catch(() => {
+      rivBufferCache.set(url, null);
+      return null;
+    });
+
+  rivBufferPromiseCache.set(url, promise);
+  return promise;
+}
+
+export function preloadRivAssets(urls: string[] = CORE_RIV_FILES): void {
+  if (typeof window === 'undefined') return;
+  for (const url of urls) {
+    void fetchRivBuffer(url);
+  }
+}
+
+// Configure Rive WASM runtime to load from local /riv/rive.wasm instead of external unpkg CDN
+if (typeof window !== 'undefined') {
   try {
-    const res = await fetch(url, { method: 'HEAD', cache: 'no-store' });
-    const contentType = res.headers.get('content-type') || '';
-    const valid = res.ok && !contentType.includes('text/html');
-    rivProbeCache.set(url, valid);
-    return valid;
+    RuntimeLoader.setWasmUrl('/riv/rive.wasm');
+    RuntimeLoader.setWasmFallbackUrl('/riv/rive_fallback.wasm');
+    void RuntimeLoader.awaitInstance().catch(() => {});
+    preloadRivAssets(CORE_RIV_FILES);
   } catch {
-    rivProbeCache.set(url, false);
-    return false;
+    // Ignore SSR or duplicate initialization
   }
 }
 
 interface RiveCanvasRuntimeProps {
   src: string;
+  buffer?: ArrayBuffer | null;
+  pixelSize: number;
   state: RiveAvatarState;
   stateMachineName?: string;
   faceCrop?: boolean;
@@ -81,24 +138,42 @@ interface RiveCanvasRuntimeProps {
 
 function RiveCanvasRuntime({
   src,
+  buffer,
+  pixelSize,
   state,
   stateMachineName = 'Character',
   faceCrop = true,
   onLoadFailure,
 }: RiveCanvasRuntimeProps) {
-  const { rive, RiveComponent } = useRive({
-    src,
-    stateMachines: stateMachineName,
-    autoplay: true,
-    autoBind: true,
-    layout: new Layout({
-      fit: Fit.Contain,
-      alignment: Alignment.Center,
-    }),
-    onLoadError: () => {
-      onLoadFailure();
+  const bufferCopy = useMemo(
+    () => (buffer ? buffer.slice(0) : undefined),
+    [buffer]
+  );
+
+  const customDpr = useMemo(() => {
+    if (typeof window === 'undefined') return 1;
+    const dpr = window.devicePixelRatio || 1;
+    return Math.min(dpr, pixelSize <= 112 ? 1.5 : 2);
+  }, [pixelSize]);
+
+  const { rive, RiveComponent } = useRive(
+    {
+      ...(bufferCopy ? { buffer: bufferCopy } : { src }),
+      stateMachines: stateMachineName,
+      autoplay: true,
+      autoBind: true,
+      shouldDisableRiveListeners: true,
+      layout: AVATAR_RIVE_LAYOUT,
+      onLoadError: () => {
+        onLoadFailure();
+      },
     },
-  });
+    {
+      shouldUseIntersectionObserver: true,
+      useDevicePixelRatio: true,
+      customDevicePixelRatio: customDpr,
+    }
+  );
 
   useEffect(() => {
     if (!rive) return;
@@ -247,25 +322,45 @@ export function RiveAvatar({
   stateMachineName = 'Character',
   discBackground,
   className = '',
+  loadDelayMs = 0,
   onStateClick,
 }: RiveAvatarProps) {
-  const uniqueId = useId().replace(/:/g, '');
+  useId();
   const pixelSize = typeof size === 'number' ? size : SIZE_MAP[size] ?? 88;
+  const primaryUrl = customRivBlobUrl || rivSrc || '/riv/jun.riv';
 
-  const [resolvedRivUrl, setResolvedRivUrl] = useState<string | null>(
-    customRivBlobUrl || rivSrc || '/riv/jun.riv'
+  const [resolvedRivUrl, setResolvedRivUrl] = useState<string | null>(() =>
+    primaryUrl
   );
+  const [resolvedBuffer, setResolvedBuffer] = useState<ArrayBuffer | null>(
+    () => rivBufferCache.get(primaryUrl) ?? null
+  );
+  const [isDelayReady, setIsDelayReady] = useState<boolean>(loadDelayMs <= 0);
   const [riveFailed, setRiveFailed] = useState(false);
 
-  // Probe candidate .riv files in priority order
+  useEffect(() => {
+    if (loadDelayMs <= 0) {
+      setIsDelayReady(true);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setIsDelayReady(true);
+    }, loadDelayMs);
+    return () => clearTimeout(timer);
+  }, [loadDelayMs]);
+
+  // Resolve and cache the .riv ArrayBuffer once per unique URL across the whole app
   useEffect(() => {
     let cancelled = false;
     setRiveFailed(false);
-    setResolvedRivUrl(customRivBlobUrl || rivSrc || '/riv/jun.riv');
 
     async function resolveSource() {
       if (customRivBlobUrl) {
-        if (!cancelled) setResolvedRivUrl(customRivBlobUrl);
+        const buf = await fetchRivBuffer(customRivBlobUrl);
+        if (!cancelled) {
+          setResolvedRivUrl(customRivBlobUrl);
+          setResolvedBuffer(buf);
+        }
         return;
       }
 
@@ -274,16 +369,27 @@ export function RiveAvatar({
       ).filter(Boolean);
 
       for (const candidate of candidates) {
-        const exists = await checkRivExists(candidate);
+        const cached = rivBufferCache.get(candidate);
+        if (cached) {
+          if (!cancelled) {
+            setResolvedRivUrl(candidate);
+            setResolvedBuffer(cached);
+          }
+          return;
+        }
+
+        const buf = await fetchRivBuffer(candidate);
         if (cancelled) return;
-        if (exists) {
+        if (buf) {
           setResolvedRivUrl(candidate);
+          setResolvedBuffer(buf);
           return;
         }
       }
 
       if (!cancelled) {
         setResolvedRivUrl(null);
+        setResolvedBuffer(null);
       }
     }
 
@@ -293,36 +399,15 @@ export function RiveAvatar({
     };
   }, [rivSrc, customRivBlobUrl]);
 
-  const handleAvatarClick = () => {
-    if (!interactive && !onStateClick) return;
-    const currentIndex = STATE_ORDER.indexOf(state);
-    const nextState = STATE_ORDER[(currentIndex + 1) % STATE_ORDER.length];
-    onStateClick?.(nextState);
-  };
-
   return (
     <div
-      onClick={interactive || onStateClick ? handleAvatarClick : undefined}
-      role={interactive || onStateClick ? 'button' : 'img'}
+      role="img"
       aria-label={`${mentorName} Rive Avatar (${state} state)`}
-      tabIndex={interactive || onStateClick ? 0 : undefined}
-      onKeyDown={
-        interactive || onStateClick
-          ? (e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                handleAvatarClick();
-              }
-            }
-          : undefined
-      }
       style={{
         width: pixelSize,
         height: pixelSize,
       }}
-      className={`relative select-none flex items-center justify-center rounded-full transition-transform duration-300 ${
-        interactive || onStateClick ? 'cursor-pointer active:scale-95' : ''
-      } ${className}`}
+      className={`relative select-none flex items-center justify-center rounded-full transition-transform duration-300 ${className}`}
     >
       {/* Equipped Aura Effect Layer */}
       {equippedAuraId && (
@@ -370,11 +455,13 @@ export function RiveAvatar({
           }}
         />
 
-        {resolvedRivUrl && !riveFailed ? (
+        {isDelayReady && resolvedRivUrl && resolvedBuffer && !riveFailed ? (
           <div className="relative z-10 w-full h-full">
             <RiveCanvasRuntime
               key={resolvedRivUrl}
               src={resolvedRivUrl}
+              buffer={resolvedBuffer}
+              pixelSize={pixelSize}
               state={state}
               stateMachineName={stateMachineName}
               onLoadFailure={() => setRiveFailed(true)}

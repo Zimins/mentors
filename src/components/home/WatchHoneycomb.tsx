@@ -301,6 +301,9 @@ export function WatchHoneycomb() {
   // then flips 180deg in a radial wave to reveal the mentors!
   const [isMentosFlipped, setIsMentosFlipped] = useState(false);
 
+  // Automatic Random Mentor Spotlight (especially for mobile where there is no mouse cursor)
+  const [spotlightCellId, setSpotlightCellId] = useState<string | null>(null);
+
   // Subtle drag pan + pointer proximity magnification (desktop mouse)
   const stageRef = useRef<HTMLDivElement | null>(null);
   const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({
@@ -327,6 +330,9 @@ export function WatchHoneycomb() {
   );
   const [customRivChoice, setCustomRivChoice] = useState('/riv/jun.riv');
   const [customColor, setCustomColor] = useState('#38bdf8');
+  const [diagLevel, setDiagLevel] = useState<
+    'beginner' | 'intermediate' | 'advanced'
+  >('intermediate');
 
   // Detect mobile vs desktop viewport and trigger the Mentos candy flip animation on entry
   useEffect(() => {
@@ -339,7 +345,7 @@ export function WatchHoneycomb() {
     // Hold the colorful Mentos candy layout briefly on initial entry, then flip each candy over
     const flipTimer = setTimeout(() => {
       setIsMentosFlipped(true);
-    }, 220);
+    }, 320);
 
     return () => {
       window.removeEventListener('resize', updateViewport);
@@ -368,7 +374,7 @@ export function WatchHoneycomb() {
         }
 
         const dist = Math.hypot(x, y);
-        if (dist > 920) continue;
+        if (dist > 820) continue;
 
         rawPoints.push({ x, y, dist });
       }
@@ -394,22 +400,24 @@ export function WatchHoneycomb() {
     });
   }, []);
 
-  // Mobile Apple Watch Honeycomb Lattice: frames top & bottom of mobile screens without overlapping the central title
+  // Mobile Apple Watch Honeycomb Lattice: rich, prominent mentor cluster framing the mobile hero
   const mobileHoneycombCells: HoneycombCell[] = useMemo(() => {
     const pool = HONEYCOMB_CATALOG;
-    const hexSpacingX = 96;
+    const hexSpacingX = 94;
     const hexSpacingY = 82;
     const rawPoints: Array<{ x: number; y: number; dist: number }> = [];
 
     for (let row = -3; row <= 3; row++) {
       if (Math.abs(row) <= 1) continue;
       const isOddRow = Math.abs(row) % 2 === 1;
-      const minCol = isOddRow ? -2 : -1;
-      const maxCol = 1;
+      const minCol = isOddRow ? -2 : -2;
+      const maxCol = isOddRow ? 1 : 2;
 
       for (let col = minCol; col <= maxCol; col++) {
         const x = col * hexSpacingX + (isOddRow ? hexSpacingX * 0.5 : 0);
-        const y = row * hexSpacingY + (row > 0 ? 28 : -28);
+        // Keep within mobile screen width while framing the hero copy cleanly
+        if (Math.abs(x) > 165) continue;
+        const y = row * hexSpacingY + (row > 0 ? 34 : -34);
         const dist = Math.hypot(x, y);
         rawPoints.push({ x, y, dist });
       }
@@ -421,7 +429,7 @@ export function WatchHoneycomb() {
       const template = pool[idx % pool.length];
       const discBackground =
         WATCH_DISC_PALETTES[idx % WATCH_DISC_PALETTES.length];
-      const ringScale = Math.abs(pt.y) > 220 ? 0.88 : 0.98;
+      const ringScale = Math.abs(pt.y) > 225 ? 0.9 : 1.02;
 
       return {
         id: `mcell-${idx}-${template.baseMentorId}`,
@@ -438,6 +446,38 @@ export function WatchHoneycomb() {
   const activeCells = isMobileViewport
     ? mobileHoneycombCells
     : desktopHoneycombCells;
+
+  // Randomly highlight a mentor every 2.4s when no mouse cursor is hovering (essential on mobile!)
+  useEffect(() => {
+    if (!isMentosFlipped || activeCells.length === 0) return;
+
+    // Pick candidates that are well inside the viewport so the highlighted mentor + label never clip
+    const spotlightCandidates = activeCells.filter((cell) =>
+      isMobileViewport
+        ? Math.abs(cell.baseX) <= 125 && Math.abs(cell.baseY) <= 235
+        : Math.abs(cell.baseX) <= 460 && Math.abs(cell.baseY) <= 280
+    );
+    const pool =
+      spotlightCandidates.length > 0 ? spotlightCandidates : activeCells;
+
+    // Immediately pick an initial spotlight mentor once flipped
+    setSpotlightCellId((prev) => {
+      if (prev && pool.some((c) => c.id === prev)) return prev;
+      return pool[Math.floor(Math.random() * pool.length)]?.id ?? null;
+    });
+
+    const interval = setInterval(() => {
+      setSpotlightCellId((prev) => {
+        const available =
+          pool.length > 1 ? pool.filter((c) => c.id !== prev) : pool;
+        const chosen =
+          available[Math.floor(Math.random() * available.length)] || pool[0];
+        return chosen ? chosen.id : null;
+      });
+    }, 2400);
+
+    return () => clearInterval(interval);
+  }, [isMentosFlipped, activeCells, isMobileViewport]);
 
   const handleStagePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.pointerType === 'touch') return;
@@ -533,174 +573,214 @@ export function WatchHoneycomb() {
       )
     : [];
 
+  // Active virtual focus point: either the desktop mouse pointer OR the randomly spotlighted mentor cell
+  const activeSpotlightCell =
+    !pointerPos && !hoveredCellId && !selectedPitchCell && spotlightCellId
+      ? activeCells.find((c) => c.id === spotlightCellId) ?? null
+      : null;
+
+  const effectiveFocusPos = pointerPos
+    ? pointerPos
+    : activeSpotlightCell
+    ? { x: activeSpotlightCell.baseX, y: activeSpotlightCell.baseY }
+    : null;
+
   return (
-    <div
-      className={`min-h-screen w-full bg-black text-[#f5f5f7] overflow-x-hidden selection:bg-sky-500/30 transition-all duration-500 ${
-        isEnrolling ? 'scale-[1.03] opacity-0 blur-sm' : 'scale-100 opacity-100'
-      }`}
-    >
-      {/* =====================================================================
-          HERO SECTION: MENTOS-FLIP APPLE WATCH HONEYCOMB LAUNCHER
-         ===================================================================== */}
-      <section
-        ref={stageRef}
-        onPointerDown={handleStagePointerDown}
-        onPointerMove={handleStagePointerMove}
-        onPointerUp={handleStagePointerUp}
-        onPointerLeave={() => {
-          setIsDragging(false);
-          setPointerPos(null);
-        }}
-        className="relative h-[calc(100vh-3.5rem)] min-h-[640px] w-full overflow-hidden bg-black flex flex-col items-center justify-center select-none touch-pan-y"
+    <div className="min-h-screen w-full bg-black text-[#f5f5f7] overflow-x-hidden selection:bg-sky-500/30">
+      {/* Main Page Content Wrapper (transform only applied while enrolling so fixed modals stay viewport-centered) */}
+      <div
+        className={`w-full transition-all duration-500 ${
+          isEnrolling
+            ? 'scale-[1.03] opacity-0 blur-sm'
+            : 'opacity-100'
+        }`}
       >
-        {/* HONEYCOMB BUBBLE CLUSTER WITH 3D MENTOS CANDY FLIP REVEAL */}
-        <div className="pointer-events-none absolute inset-0">
-          {activeCells.map((cell, idx) => {
-            const isHovered = hoveredCellId === cell.id;
-            const isSelected = selectedPitchCell?.id === cell.id;
-            const baseX = cell.baseX + (isMobileViewport ? 0 : panOffset.x);
-            const baseY = cell.baseY + (isMobileViewport ? 0 : panOffset.y);
+        {/* =====================================================================
+            HERO SECTION: MENTOS-FLIP APPLE WATCH HONEYCOMB LAUNCHER
+           ===================================================================== */}
+        <section
+          ref={stageRef}
+          onPointerDown={handleStagePointerDown}
+          onPointerMove={handleStagePointerMove}
+          onPointerUp={handleStagePointerUp}
+          onPointerLeave={() => {
+            setIsDragging(false);
+            setPointerPos(null);
+          }}
+          className="relative h-[calc(100dvh-3.5rem)] min-h-[620px] w-full overflow-hidden bg-black flex flex-col items-center justify-center select-none touch-pan-y"
+        >
+          {/* HONEYCOMB BUBBLE CLUSTER WITH 3D MENTOS CANDY FLIP REVEAL */}
+          <div className="pointer-events-none absolute inset-0">
+            {activeCells.map((cell, idx) => {
+              const isHovered = hoveredCellId === cell.id;
+              const isSelected = selectedPitchCell?.id === cell.id;
+              const isSpotlight = activeSpotlightCell?.id === cell.id;
+              const isHighlighted = isHovered || isSelected || isSpotlight;
 
-            // Apple Watch Cursor-Proximity Magnification + gentle radial neighbor push
-            let proximityScale = 1;
-            let pushX = 0;
-            let pushY = 0;
+              const baseX = cell.baseX + (isMobileViewport ? 0 : panOffset.x);
+              const baseY = cell.baseY + (isMobileViewport ? 0 : panOffset.y);
 
-            if (!isMobileViewport && pointerPos) {
-              const dx = baseX - pointerPos.x;
-              const dy = baseY - pointerPos.y;
-              const dist = Math.hypot(dx, dy);
-              const radius = 260;
+              // Apple Watch Cursor-Proximity OR Mobile Random Spotlight Magnification + radial neighbor push
+              let proximityScale = 1;
+              let pushX = 0;
+              let pushY = 0;
 
-              if (dist < radius) {
-                const t = 1 - dist / radius;
-                const smoothT = t * t * (3 - 2 * t);
-                proximityScale = 1 + smoothT * 0.34;
+              if (effectiveFocusPos) {
+                const dx = baseX - effectiveFocusPos.x;
+                const dy = baseY - effectiveFocusPos.y;
+                const dist = Math.hypot(dx, dy);
+                const radius = isMobileViewport ? 175 : 260;
 
-                if (dist > 6) {
-                  const pushMag = (1 - t) * smoothT * 18;
-                  pushX = (dx / dist) * pushMag;
-                  pushY = (dy / dist) * pushMag;
+                if (dist < radius) {
+                  const t = 1 - dist / radius;
+                  const smoothT = t * t * (3 - 2 * t);
+                  proximityScale =
+                    1 + smoothT * (isMobileViewport ? 0.28 : 0.34);
+
+                  if (dist > 6) {
+                    const pushMag =
+                      (1 - t) * smoothT * (isMobileViewport ? 14 : 18);
+                    pushX = (dx / dist) * pushMag;
+                    pushY = (dy / dist) * pushMag;
+                  }
                 }
               }
-            }
 
-            const finalX = baseX + pushX;
-            const finalY = baseY + pushY;
-            const finalScale =
-              cell.ringScale *
-              proximityScale *
-              (isHovered || isSelected ? 1.1 : 1);
+              const finalX = baseX + pushX;
+              const finalY = baseY + pushY;
+              const finalScale =
+                cell.ringScale *
+                proximityScale *
+                (isHovered || isSelected ? 1.1 : isSpotlight ? 1.08 : 1);
 
-            const avatarSize = isMobileViewport ? 72 : 108;
-            // Staggered radial flip delay so the Mentos discs flip outward in a wave
-            const flipDelayMs = Math.min(780, idx * 28);
+              const avatarSize = isMobileViewport ? 82 : 108;
+              // Snappy staggered radial flip delay so Mentos discs flip outward smoothly without lag
+              const flipDelayMs = Math.min(340, idx * 9);
+              const riveMountDelayMs = Math.min(180, Math.floor(idx / 6) * 18);
 
-            return (
-              <div
-                key={cell.id}
-                style={{
-                  transform: `translate3d(${finalX.toFixed(1)}px, ${finalY.toFixed(
-                    1
-                  )}px, 0) scale(${finalScale.toFixed(3)})`,
-                  zIndex:
-                    isHovered || isSelected
+              return (
+                <div
+                  key={cell.id}
+                  style={{
+                    transform: `translate3d(${finalX.toFixed(
+                      1
+                    )}px, ${finalY.toFixed(1)}px, 0) scale(${finalScale.toFixed(
+                      3
+                    )})`,
+                    zIndex: isHighlighted
                       ? 50
                       : proximityScale > 1.12
                       ? 35
                       : 15,
-                }}
-                className="pointer-events-auto absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 transition-transform duration-150 ease-out will-change-transform"
-              >
-                <button
-                  type="button"
-                  onMouseEnter={() => setHoveredCellId(cell.id)}
-                  onMouseLeave={() => setHoveredCellId(null)}
-                  onClick={() => handleSelectCell(cell)}
-                  aria-label={`${cell.name} - ${cell.shortTag}`}
-                  style={{ perspective: '900px' }}
-                  className="group relative flex items-center justify-center rounded-full focus:outline-none cursor-pointer active:scale-95 transition-transform"
+                  }}
+                  className={`pointer-events-auto absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 will-change-transform ${
+                    pointerPos
+                      ? 'transition-transform duration-150 ease-out'
+                      : 'transition-transform duration-500 ease-out'
+                  }`}
                 >
-                  {/* 3D Flip Container: Front = Mentos Candy Disc, Back = Mentor Face */}
-                  <div
-                    style={{
-                      width: avatarSize,
-                      height: avatarSize,
-                      transformStyle: 'preserve-3d',
-                      transition: `transform 760ms cubic-bezier(0.22, 1, 0.36, 1) ${flipDelayMs}ms, box-shadow 200ms ease`,
-                      transform: isMentosFlipped
-                        ? 'rotateY(180deg)'
-                        : 'rotateY(0deg)',
-                      boxShadow:
-                        isHovered || isSelected
-                          ? '0 0 0 3px #ffffff, 0 14px 36px rgba(0,0,0,0.85)'
-                          : '0 6px 18px rgba(0,0,0,0.75)',
-                    }}
-                    className="relative rounded-full"
+                  <button
+                    type="button"
+                    onMouseEnter={() => setHoveredCellId(cell.id)}
+                    onMouseLeave={() => setHoveredCellId(null)}
+                    onClick={() => handleSelectCell(cell)}
+                    aria-label={`${cell.name} - ${cell.shortTag}`}
+                    style={{ perspective: '900px' }}
+                    className="group relative flex items-center justify-center rounded-full focus:outline-none cursor-pointer active:scale-95 transition-transform"
                   >
-                    {/* FRONT FACE (0deg): Tactile Glossy Mentos Candy Disc */}
+                    {/* 3D Flip Container: Front = Mentos Candy Disc, Back = Mentor Face */}
                     <div
                       style={{
-                        background: cell.discBackground,
-                        backfaceVisibility: 'hidden',
-                        WebkitBackfaceVisibility: 'hidden',
+                        width: avatarSize,
+                        height: avatarSize,
+                        transformStyle: 'preserve-3d',
+                        transition: `transform 520ms cubic-bezier(0.22, 1, 0.36, 1) ${flipDelayMs}ms, box-shadow 350ms ease`,
+                        transform: isMentosFlipped
+                          ? 'rotateY(180deg)'
+                          : 'rotateY(0deg)',
+                        boxShadow: isHighlighted
+                          ? `0 0 0 3px #ffffff, 0 0 28px ${cell.accentColor}cc, 0 14px 36px rgba(0,0,0,0.85)`
+                          : `0 0 0 2px ${cell.accentColor}77, 0 8px 22px rgba(0,0,0,0.75)`,
                       }}
-                      className="absolute inset-0 rounded-full overflow-hidden flex items-center justify-center"
+                      className="relative rounded-full"
                     >
-                      {/* Mentos 3D Glossy Specular Highlight & Rim */}
+                      {/* FRONT FACE (0deg): Tactile Glossy Mentos Candy Disc */}
                       <div
-                        className="pointer-events-none absolute inset-0 rounded-full"
                         style={{
-                          background:
-                            'radial-gradient(circle at 30% 24%, rgba(255,255,255,0.65) 0%, rgba(255,255,255,0.12) 34%, rgba(0,0,0,0.22) 100%)',
-                          boxShadow:
-                            'inset 0 3px 6px rgba(255,255,255,0.6), inset 0 -5px 10px rgba(0,0,0,0.35)',
+                          background: cell.discBackground,
+                          backfaceVisibility: 'hidden',
+                          WebkitBackfaceVisibility: 'hidden',
                         }}
-                      />
-                    </div>
-
-                    {/* BACK FACE (180deg): Expressive Mentor Face revealed after flip */}
-                    <div
-                      style={{
-                        transform: 'rotateY(180deg)',
-                        backfaceVisibility: 'hidden',
-                        WebkitBackfaceVisibility: 'hidden',
-                      }}
-                      className="absolute inset-0 rounded-full overflow-hidden"
-                    >
-                      <RiveAvatar
-                        rivSrc={cell.rivFile}
-                        state={isHovered || isSelected ? 'talking' : 'idle'}
-                        accentColor={cell.accentColor}
-                        secondaryColor={cell.secondaryColor}
-                        discBackground={cell.discBackground}
-                        size={avatarSize}
-                        mentorName={cell.name}
-                        stateMachineName="Character"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Floating pill label shown on hover */}
-                  {isHovered && (
-                    <div className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 z-50 px-2.5 py-0.5 rounded-full bg-slate-950/95 border border-white/20 shadow-xl whitespace-nowrap">
-                      <span className="text-[10px] font-bold text-white">
-                        {cell.name}
-                      </span>
-                      <span className="mx-1 text-slate-500">·</span>
-                      <span
-                        className="text-[10px] font-semibold"
-                        style={{ color: cell.accentColor }}
+                        className="absolute inset-0 rounded-full overflow-hidden flex items-center justify-center"
                       >
-                        {cell.shortTag}
-                      </span>
+                        {/* Mentos 3D Glossy Specular Highlight & Rim */}
+                        <div
+                          className="pointer-events-none absolute inset-0 rounded-full"
+                          style={{
+                            background:
+                              'radial-gradient(circle at 30% 24%, rgba(255,255,255,0.65) 0%, rgba(255,255,255,0.12) 34%, rgba(0,0,0,0.22) 100%)',
+                            boxShadow:
+                              'inset 0 3px 6px rgba(255,255,255,0.6), inset 0 -5px 10px rgba(0,0,0,0.35)',
+                          }}
+                        />
+                      </div>
+
+                      {/* BACK FACE (180deg): Expressive Mentor Face revealed after flip */}
+                      <div
+                        style={{
+                          transform: 'rotateY(180deg)',
+                          backfaceVisibility: 'hidden',
+                          WebkitBackfaceVisibility: 'hidden',
+                        }}
+                        className="absolute inset-0 rounded-full overflow-hidden"
+                      >
+                        <RiveAvatar
+                          rivSrc={cell.rivFile}
+                          state={isHighlighted ? 'talking' : 'idle'}
+                          accentColor={cell.accentColor}
+                          secondaryColor={cell.secondaryColor}
+                          discBackground={cell.discBackground}
+                          size={avatarSize}
+                          mentorName={cell.name}
+                          stateMachineName="Character"
+                          loadDelayMs={riveMountDelayMs}
+                        />
+                        {/* Glossy Mentos-colored inner rim over the Rive canvas edge so mentors stand out vividly */}
+                        <div
+                          className="pointer-events-none absolute inset-0 rounded-full z-20"
+                          style={{
+                            boxShadow: isHighlighted
+                              ? `inset 0 0 0 3.5px ${cell.accentColor}, inset 0 2px 8px rgba(255,255,255,0.5)`
+                              : `inset 0 0 0 2.5px ${cell.accentColor}99, inset 0 2px 5px rgba(255,255,255,0.28)`,
+                          }}
+                        />
+                      </div>
                     </div>
-                  )}
-                </button>
-              </div>
-            );
-          })}
-        </div>
+
+                    {/* Floating pill label shown on hover OR when randomly spotlighted on mobile/idle */}
+                    {(isHovered || isSpotlight) && (
+                      <div className="pointer-events-none absolute -bottom-7 left-1/2 -translate-x-1/2 z-50 px-2.5 py-0.5 rounded-full bg-slate-950/95 border border-white/25 shadow-[0_8px_24px_rgba(0,0,0,0.9)] whitespace-nowrap flex items-center gap-1.5 animate-in fade-in zoom-in-95 duration-200">
+                        <span
+                          className="w-1.5 h-1.5 rounded-full animate-pulse"
+                          style={{ backgroundColor: cell.accentColor }}
+                        />
+                        <span className="text-[10px] font-bold text-white">
+                          {cell.name}
+                        </span>
+                        <span className="text-slate-500">·</span>
+                        <span
+                          className="text-[10px] font-semibold"
+                          style={{ color: cell.accentColor }}
+                        >
+                          {cell.shortTag}
+                        </span>
+                      </div>
+                    )}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
 
         {/* WINDOW-CENTERED HERO TITLE, DESCRIPTION & TWO MAIN BUTTONS */}
         <div className="relative z-40 max-w-lg w-full mx-auto px-5 text-center pointer-events-auto">
@@ -752,11 +832,11 @@ export function WatchHoneycomb() {
       </section>
 
       {/* =====================================================================
-          APPLE.COM EDITORIAL SHOWCASE (PURE DARK TYPOGRAPHY, NO BOX CLUTTER)
+          APPLE.COM EDITORIAL SHOWCASE + VISUAL SCHEMATICS & LIVE MENTOR NODES
          ===================================================================== */}
       <div id="why-mentors" className="relative z-30 bg-black">
         {/* -------------------------------------------------------------------
-            01. WHY A MENTOR, NOT JUST A TEACHER (PROACTIVE LEVEL DIAGNOSIS)
+            01. WHY A MENTOR, NOT JUST A TEACHER (PROACTIVE LEVEL DIAGNOSIS SCHEMATIC)
            ------------------------------------------------------------------- */}
         <section className="max-w-5xl mx-auto px-6 sm:px-10 pt-28 sm:pt-36 pb-24 sm:pb-32">
           <p className="text-xs sm:text-sm font-semibold uppercase tracking-[0.2em] text-sky-400">
@@ -776,53 +856,230 @@ export function WatchHoneycomb() {
             pace.
           </p>
 
-          <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-12 pt-12 border-t border-white/10">
-            <div>
-              <div className="text-sm font-semibold text-sky-400">
-                Proactive Initiative
+          {/* VISUAL SCHEMATIC 01: 3-STAGE PROACTIVE DIAGNOSTIC PIPELINE */}
+          <div className="mt-16 pt-12 border-t border-white/10">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-10">
+              <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+                Live Architectural Schematic · Proactive Level Calibration
               </div>
-              <h3 className="mt-2 text-xl sm:text-2xl font-bold text-white tracking-tight">
-                Starts the dialogue first.
-              </h3>
-              <p className="mt-3 text-sm sm:text-base text-[#86868b] leading-relaxed">
-                The moment you enter a curriculum channel, your mentor greets
-                you with a targeted question to uncover how you already think
-                about the topic.
-              </p>
+              <div className="flex items-center gap-1.5 text-xs">
+                <span className="text-slate-500 mr-1">Simulate Level:</span>
+                {(
+                  [
+                    { id: 'beginner', label: 'Lv.1 Intuition', color: '#34d399' },
+                    { id: 'intermediate', label: 'Lv.2 Systems', color: '#38bdf8' },
+                    { id: 'advanced', label: 'Lv.3 Kernel', color: '#a855f7' },
+                  ] as const
+                ).map((lv) => (
+                  <button
+                    key={lv.id}
+                    type="button"
+                    onClick={() => setDiagLevel(lv.id)}
+                    className={`px-3 py-1 rounded-full font-semibold transition cursor-pointer ${
+                      diagLevel === lv.id
+                        ? 'bg-white text-slate-950 shadow-sm'
+                        : 'text-slate-400 hover:text-white bg-white/[0.04]'
+                    }`}
+                  >
+                    {lv.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div>
-              <div className="text-sm font-semibold text-indigo-400">
-                Live Level Calibration
-              </div>
-              <h3 className="mt-2 text-xl sm:text-2xl font-bold text-white tracking-tight">
-                Adapts from Beginner to Advanced.
-              </h3>
-              <p className="mt-3 text-sm sm:text-base text-[#86868b] leading-relaxed">
-                Every response and diagnostic quiz recalibrates your mastery
-                profile—automatically shifting between intuitive analogies and
-                rigorous engineering depth.
-              </p>
-            </div>
+            {/* 3-Node Horizontal Flow Diagram with Live RiveAvatar */}
+            <div className="relative grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-4 items-center">
+              {/* STAGE 1: PROACTIVE MENTOR INITIATION NODE */}
+              <div className="lg:col-span-4 flex flex-col items-center lg:items-start text-center lg:text-left">
+                <div className="relative flex items-center gap-4">
+                  <div className="relative">
+                    {/* Radar Pulse Rings around Live Mentor */}
+                    <span className="pointer-events-none absolute -inset-3 rounded-full border border-sky-400/30 animate-ping opacity-30" />
+                    <span className="pointer-events-none absolute -inset-1.5 rounded-full border border-sky-400/40" />
+                    <RiveAvatar
+                      rivSrc="/riv/jun.riv"
+                      state="talking"
+                      accentColor="#38bdf8"
+                      secondaryColor="#0284c7"
+                      discBackground={WATCH_DISC_PALETTES[2]}
+                      size={88}
+                      mentorName="Prof. Jun"
+                      stateMachineName="Character"
+                    />
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-sky-400">
+                      01 · Speaks First
+                    </div>
+                    <div className="text-lg font-bold text-white">
+                      Prof. Jun
+                    </div>
+                    <div className="text-xs text-[#86868b]">
+                      Proactive Diagnostic Probe
+                    </div>
+                  </div>
+                </div>
 
-            <div>
-              <div className="text-sm font-semibold text-emerald-400">
-                Channel-Based Curriculum
+                {/* Speech Signal Callout */}
+                <div className="mt-4 pl-0 lg:pl-3 border-l-0 lg:border-l-2 border-sky-400/40 text-xs sm:text-sm text-slate-300 italic leading-relaxed">
+                  &ldquo;Before we start—when you pass a large struct in C, what
+                  happens to the stack frame?&rdquo;
+                </div>
               </div>
-              <h3 className="mt-2 text-xl sm:text-2xl font-bold text-white tracking-tight">
-                Structured like a real workspace.
-              </h3>
-              <p className="mt-3 text-sm sm:text-base text-[#86868b] leading-relaxed">
-                Learn across dedicated <code className="text-white">#01</code>{' '}
-                to <code className="text-white">#04</code> curriculum channels
-                where each step builds deliberately on what you just mastered.
-              </p>
+
+              {/* SVG CONNECTOR ARROW 1 */}
+              <div className="hidden lg:flex lg:col-span-1 items-center justify-center">
+                <svg
+                  viewBox="0 0 64 24"
+                  className="w-16 h-6 text-sky-400/70 overflow-visible"
+                >
+                  <line
+                    x1="0"
+                    y1="12"
+                    x2="54"
+                    y2="12"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeDasharray="4 4"
+                  />
+                  <polygon points="52,7 62,12 52,17" fill="currentColor" />
+                </svg>
+              </div>
+
+              {/* STAGE 2: REAL-TIME LEVEL RADAR & SPECTRUM GAUGE */}
+              <div className="lg:col-span-3 flex flex-col justify-center">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-indigo-400 mb-2">
+                  02 · Live Depth Radar
+                </div>
+                <div className="text-base font-bold text-white">
+                  {diagLevel === 'beginner'
+                    ? 'Diagnosed: Visual Intuition (38%)'
+                    : diagLevel === 'intermediate'
+                    ? 'Diagnosed: Systems Mental Model (74%)'
+                    : 'Diagnosed: Kernel & ABI Mastery (94%)'}
+                </div>
+
+                {/* Spectrum Bar Schematic */}
+                <div className="mt-3 relative h-2 w-full rounded-full bg-white/10 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-sky-400 to-purple-400 transition-all duration-500"
+                    style={{
+                      width:
+                        diagLevel === 'beginner'
+                          ? '38%'
+                          : diagLevel === 'intermediate'
+                          ? '74%'
+                          : '94%',
+                    }}
+                  />
+                </div>
+                <div className="mt-2 flex justify-between text-[10px] font-semibold uppercase tracking-wider text-[#86868b]">
+                  <span className={diagLevel === 'beginner' ? 'text-emerald-400' : ''}>
+                    Analogy
+                  </span>
+                  <span className={diagLevel === 'intermediate' ? 'text-sky-400' : ''}>
+                    Architecture
+                  </span>
+                  <span className={diagLevel === 'advanced' ? 'text-purple-400' : ''}>
+                    Assembly
+                  </span>
+                </div>
+              </div>
+
+              {/* SVG CONNECTOR ARROW 2 (BRANCHING) */}
+              <div className="hidden lg:flex lg:col-span-1 items-center justify-center">
+                <svg
+                  viewBox="0 0 64 64"
+                  className="w-16 h-16 text-indigo-400/70 overflow-visible"
+                >
+                  <path
+                    d="M 0 32 C 28 32, 28 10, 56 10"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeDasharray="3 3"
+                  />
+                  <path
+                    d="M 0 32 L 56 32"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  />
+                  <path
+                    d="M 0 32 C 28 32, 28 54, 56 54"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeDasharray="3 3"
+                  />
+                  <circle cx="56" cy="10" r="3" fill="#34d399" />
+                  <circle cx="56" cy="32" r="3" fill="#38bdf8" />
+                  <circle cx="56" cy="54" r="3" fill="#a855f7" />
+                </svg>
+              </div>
+
+              {/* STAGE 3: ADAPTIVE #CHANNEL CURRICULUM TREE */}
+              <div className="lg:col-span-3 space-y-2.5">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 mb-1">
+                  03 · Tailored #Channels
+                </div>
+                {[
+                  {
+                    ch: '01-pointers-and-stack-heap',
+                    desc:
+                      diagLevel === 'beginner'
+                        ? 'Visualizing memory boxes & addresses'
+                        : diagLevel === 'intermediate'
+                        ? 'Stack frame layout & heap fragmentation'
+                        : 'RSP/RBP register calling conventions',
+                    color: '#34d399',
+                  },
+                  {
+                    ch: '02-cpu-cache-hierarchy',
+                    desc:
+                      diagLevel === 'beginner'
+                        ? 'Why nearby data loads 100x faster'
+                        : diagLevel === 'intermediate'
+                        ? '64-byte cache lines & spatial locality'
+                        : 'MESI coherence & false sharing stalls',
+                    color: '#38bdf8',
+                  },
+                  {
+                    ch: '03-virtual-memory-and-tlb',
+                    desc:
+                      diagLevel === 'beginner'
+                        ? 'How every app gets its own private map'
+                        : diagLevel === 'intermediate'
+                        ? 'Multi-level page tables & TLB misses'
+                        : 'HugePages, CR3 switches & PCID tags',
+                    color: '#a855f7',
+                  },
+                ].map((item) => (
+                  <div
+                    key={item.ch}
+                    className="flex items-start gap-2.5 py-1.5 border-b border-white/[0.07] last:border-b-0"
+                  >
+                    <Hash
+                      className="w-4 h-4 shrink-0 mt-0.5"
+                      style={{ color: item.color }}
+                    />
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-white truncate">
+                        {item.ch}
+                      </div>
+                      <div className="text-[11px] text-[#86868b]">
+                        {item.desc}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </section>
 
         {/* -------------------------------------------------------------------
-            02. HUMAN EDUCATOR MONITORING & PROFESSIONAL FEEDBACK
+            02. HUMAN EDUCATOR MONITORING & PROFESSIONAL FEEDBACK (DUAL-LOOP DIAGRAM)
            ------------------------------------------------------------------- */}
         <section className="max-w-5xl mx-auto px-6 sm:px-10 py-24 sm:py-32 border-t border-white/10">
           <p className="text-xs sm:text-sm font-semibold uppercase tracking-[0.2em] text-emerald-400">
@@ -841,37 +1098,121 @@ export function WatchHoneycomb() {
             whenever nuance matters most.
           </p>
 
-          <div className="mt-16 grid grid-cols-1 md:grid-cols-2 gap-12 pt-12 border-t border-white/10">
-            <div>
-              <h3 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
-                Continuous trajectory monitoring.
-              </h3>
-              <p className="mt-3 text-base sm:text-lg text-[#86868b] leading-relaxed">
-                Human instructors observe where your intuition hesitates across
-                curriculum channels—catching subtle misconceptions that standard
-                automated grading misses.
-              </p>
-            </div>
+          {/* VISUAL SCHEMATIC 02: AI MENTOR <-> HUMAN EDUCATOR DUAL-LOOP TELEMETRY */}
+          <div className="mt-16 pt-12 border-t border-white/10">
+            <div className="grid grid-cols-1 lg:grid-cols-11 gap-8 items-center">
+              {/* LEFT NODE: AI MENTOR (24/7 ADAPTIVE DIALOGUE) */}
+              <div className="lg:col-span-4 flex flex-col items-center lg:items-start text-center lg:text-left">
+                <div className="flex items-center gap-4">
+                  <RiveAvatar
+                    rivSrc="/riv/mina.riv"
+                    state="talking"
+                    accentColor="#34d399"
+                    secondaryColor="#10b981"
+                    discBackground={WATCH_DISC_PALETTES[3]}
+                    size={84}
+                    mentorName="Mina"
+                    stateMachineName="Character"
+                  />
+                  <div>
+                    <span className="inline-block text-[10px] font-bold uppercase tracking-widest text-sky-400">
+                      Instant Loop · AI Mentor
+                    </span>
+                    <div className="text-xl font-bold text-white mt-0.5">
+                      Mina · Deep Learning
+                    </div>
+                    <div className="text-xs text-[#86868b]">
+                      1:1 Socratic pacing & live quizzes
+                    </div>
+                  </div>
+                </div>
+                <p className="mt-4 text-xs sm:text-sm text-[#86868b] leading-relaxed">
+                  Handles immediate Socratic questioning, interactive 3D
+                  visualizations, and diagnostic checkpoints with zero latency.
+                </p>
+              </div>
 
-            <div>
-              <h3 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
-                Direct expert feedback in your thread.
-              </h3>
-              <p className="mt-3 text-base sm:text-lg text-[#86868b] leading-relaxed">
-                Domain specialists send verified coaching notes, architecture
-                critiques, and personalized study recommendations straight into
-                your active learning channel.
-              </p>
+              {/* CENTER SVG DUAL-LOOP SIGNAL BRIDGE */}
+              <div className="lg:col-span-3 flex flex-col items-center justify-center py-2">
+                <div className="text-[10px] font-bold uppercase tracking-widest text-sky-400 mb-1">
+                   Hesitation & Progress Telemetry ➔
+                </div>
+                <svg
+                  viewBox="0 0 220 56"
+                  className="w-full max-w-[220px] h-14 overflow-visible"
+                >
+                  {/* Top forward arc: AI -> Human */}
+                  <path
+                    d="M 12 20 Q 110 -6 208 20"
+                    fill="none"
+                    stroke="#38bdf8"
+                    strokeWidth="1.75"
+                    strokeDasharray="5 4"
+                  />
+                  <polygon points="204,15 214,21 203,24" fill="#38bdf8" />
+
+                  {/* Bottom return arc: Human -> Student Thread */}
+                  <path
+                    d="M 208 36 Q 110 62 12 36"
+                    fill="none"
+                    stroke="#34d399"
+                    strokeWidth="1.75"
+                  />
+                  <polygon points="16,31 6,35 15,41" fill="#34d399" />
+
+                  <circle cx="110" cy="28" r="4" fill="#f5f5f7" />
+                </svg>
+                <div className="text-[10px] font-bold uppercase tracking-widest text-emerald-400 mt-1">
+                  ⬅ Verified Expert Coaching Note
+                </div>
+              </div>
+
+              {/* RIGHT NODE: REAL HUMAN TEACHER SUPERVISOR */}
+              <div className="lg:col-span-4 flex flex-col items-center lg:items-end text-center lg:text-right">
+                <div className="flex flex-row lg:flex-row-reverse items-center gap-4">
+                  <div className="relative">
+                    <RiveAvatar
+                      rivSrc="/riv/ms-han.riv"
+                      state="happy"
+                      accentColor="#f59e0b"
+                      secondaryColor="#d97706"
+                      discBackground={WATCH_DISC_PALETTES[1]}
+                      size={84}
+                      mentorName="Ms. Han"
+                      stateMachineName="Character"
+                    />
+                    <span className="absolute -bottom-1 right-0 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-400 text-slate-950">
+                      Human Lead
+                    </span>
+                  </div>
+                  <div>
+                    <span className="inline-block text-[10px] font-bold uppercase tracking-widest text-emerald-400">
+                      Supervisory Loop · Human Educator
+                    </span>
+                    <div className="text-xl font-bold text-white mt-0.5">
+                      Senior Instructor Review
+                    </div>
+                    <div className="text-xs text-[#86868b]">
+                       spots subtle blind spots & sends deep feedback
+                    </div>
+                  </div>
+                </div>
+                <p className="mt-4 text-xs sm:text-sm text-[#86868b] leading-relaxed">
+                  Reviews your diagnostic trajectory across channels and steps in
+                  with personalized architectural critiques when deeper insight
+                  is needed.
+                </p>
+              </div>
             </div>
           </div>
         </section>
 
         {/* -------------------------------------------------------------------
-            03. PREVIEW FEATURES: CUSTOM MENTOR DEPLOYMENT & GROUP SESSIONS
+            03. PREVIEW FEATURES: CUSTOM MENTOR BLUEPRINT & GROUP CONSTELLATION
            ------------------------------------------------------------------- */}
         <section className="max-w-5xl mx-auto px-6 sm:px-10 py-24 sm:py-36 border-t border-white/10">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-20">
-            {/* PREVIEW 1: BUILD & DEPLOY YOUR OWN MENTOR */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-start">
+            {/* PREVIEW 1: BUILD & DEPLOY YOUR OWN MENTOR + INTERACTIVE PERSONA SCHEMATIC */}
             <div>
               <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-amber-400">
                 <span>Preview</span>
@@ -889,6 +1230,96 @@ export function WatchHoneycomb() {
                 link so anyone can enroll and learn at their level.
               </p>
 
+              {/* VISUAL SCHEMATIC 03A: MENTOR BLUEPRINT SYNTHESIS DIAGRAM */}
+              <div className="mt-10 pt-8 border-t border-white/10">
+                <div className="flex items-center gap-4 sm:gap-6">
+                  {/* 3 Blueprint Inputs */}
+                  <div className="space-y-2.5 text-xs">
+                    <div className="flex items-center gap-2 text-slate-300">
+                      <span className="w-2 h-2 rounded-full bg-sky-400" />
+                      <span className="font-semibold">Custom #Channels</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-300">
+                      <span className="w-2 h-2 rounded-full bg-indigo-400" />
+                      <span className="font-semibold">Diagnostic Rubric</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-300">
+                      <span className="w-2 h-2 rounded-full bg-amber-400" />
+                      <span className="font-semibold">Mentor Persona</span>
+                    </div>
+                  </div>
+
+                  {/* Converging SVG Lines */}
+                  <svg
+                    viewBox="0 0 56 72"
+                    className="w-12 h-16 text-white/30 shrink-0 overflow-visible"
+                  >
+                    <path
+                      d="M 0 12 C 28 12, 28 36, 52 36"
+                      fill="none"
+                      stroke="#38bdf8"
+                      strokeWidth="1.5"
+                    />
+                    <path
+                      d="M 0 36 L 52 36"
+                      fill="none"
+                      stroke="#818cf8"
+                      strokeWidth="1.5"
+                    />
+                    <path
+                      d="M 0 60 C 28 60, 28 36, 52 36"
+                      fill="none"
+                      stroke="#fbbf24"
+                      strokeWidth="1.5"
+                    />
+                  </svg>
+
+                  {/* Live Previewable Custom Mentor Node */}
+                  <div className="flex items-center gap-3.5">
+                    <RiveAvatar
+                      rivSrc={customRivChoice}
+                      state="talking"
+                      accentColor={customColor}
+                      discBackground={WATCH_DISC_PALETTES[6]}
+                      size={84}
+                      mentorName={customName}
+                      stateMachineName="Character"
+                    />
+                    <div>
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                        Live Persona
+                      </div>
+                      <div className="text-sm font-bold text-white">
+                        {
+                          CUSTOM_CHARACTER_OPTIONS.find(
+                            (o) => o.riv === customRivChoice
+                          )?.label ?? 'Custom'
+                        }
+                      </div>
+                      <div className="mt-1.5 flex items-center gap-1.5">
+                        {CUSTOM_CHARACTER_OPTIONS.slice(0, 4).map((opt) => (
+                          <button
+                            key={opt.riv}
+                            type="button"
+                            onClick={() => {
+                              setCustomRivChoice(opt.riv);
+                              setCustomColor(opt.color);
+                            }}
+                            title={`Preview ${opt.label}`}
+                            style={{ backgroundColor: opt.color }}
+                            className={`w-4 h-4 rounded-full transition-transform cursor-pointer ${
+                              customRivChoice === opt.riv
+                                ? 'scale-125 ring-2 ring-white'
+                                : 'opacity-60 hover:opacity-100'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="mt-8">
                 <button
                   type="button"
@@ -901,7 +1332,7 @@ export function WatchHoneycomb() {
               </div>
             </div>
 
-            {/* PREVIEW 2: LIVE GROUP SESSIONS */}
+            {/* PREVIEW 2: LIVE GROUP SESSIONS + MULTI-LEARNER CONSTELLATION SCHEMATIC */}
             <div>
               <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-amber-400">
                 <span>Preview</span>
@@ -918,6 +1349,114 @@ export function WatchHoneycomb() {
                 Your Mentor facilitates group discussions, calibrates questions
                 across participants, and keeps everyone progressing together.
               </p>
+
+              {/* VISUAL SCHEMATIC 03B: MULTI-LEARNER CONSTELLATION HUB */}
+              <div className="mt-10 pt-8 border-t border-white/10">
+                <div className="relative h-44 w-full max-w-md flex items-center justify-center">
+                  {/* Orbital SVG Lines connecting Lead Mentor to 3 Learners */}
+                  <svg
+                    viewBox="0 0 360 170"
+                    className="pointer-events-none absolute inset-0 w-full h-full overflow-visible"
+                  >
+                    <line
+                      x1="85"
+                      y1="85"
+                      x2="235"
+                      y2="30"
+                      stroke="#ec4899"
+                      strokeWidth="1.5"
+                      strokeDasharray="4 4"
+                      opacity="0.6"
+                    />
+                    <line
+                      x1="85"
+                      y1="85"
+                      x2="265"
+                      y2="85"
+                      stroke="#38bdf8"
+                      strokeWidth="1.5"
+                      strokeDasharray="4 4"
+                      opacity="0.6"
+                    />
+                    <line
+                      x1="85"
+                      y1="85"
+                      x2="235"
+                      y2="140"
+                      stroke="#14b8a6"
+                      strokeWidth="1.5"
+                      strokeDasharray="4 4"
+                      opacity="0.6"
+                    />
+                  </svg>
+
+                  {/* Left Hub: Lead Group Mentor */}
+                  <div className="absolute left-2 top-1/2 -translate-y-1/2 flex flex-col items-center">
+                    <RiveAvatar
+                      rivSrc="/riv/coach-pen.riv"
+                      state="talking"
+                      accentColor="#ec4899"
+                      secondaryColor="#db2777"
+                      discBackground={WATCH_DISC_PALETTES[9]}
+                      size={80}
+                      mentorName="Coach Pen"
+                      stateMachineName="Character"
+                    />
+                    <span className="mt-1.5 text-[10px] font-bold text-pink-400">
+                      Host · Coach Pen
+                    </span>
+                  </div>
+
+                  {/* Right Orbit: 3 Connected Peers with Calibrated Level Tags */}
+                  <div className="absolute right-12 top-0 flex items-center gap-2">
+                    <RiveAvatar
+                      rivSrc="/riv/nabi.riv"
+                      state="idle"
+                      accentColor="#f97316"
+                      discBackground={WATCH_DISC_PALETTES[1]}
+                      size={46}
+                      mentorName="Peer 1"
+                      stateMachineName="Character"
+                    />
+                    <div className="text-[11px]">
+                      <div className="font-bold text-white">Alex</div>
+                      <div className="text-[10px] text-orange-400">Lv.2 Sync</div>
+                    </div>
+                  </div>
+
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                    <RiveAvatar
+                      rivSrc="/riv/mong.riv"
+                      state="happy"
+                      accentColor="#14b8a6"
+                      discBackground={WATCH_DISC_PALETTES[7]}
+                      size={46}
+                      mentorName="Peer 2"
+                      stateMachineName="Character"
+                    />
+                    <div className="text-[11px]">
+                      <div className="font-bold text-white">Jisu</div>
+                      <div className="text-[10px] text-teal-400">Lv.3 Sync</div>
+                    </div>
+                  </div>
+
+                  <div className="absolute right-12 bottom-0 flex items-center gap-2">
+                    <RiveAvatar
+                      rivSrc="/riv/sora.riv"
+                      state="thinking"
+                      accentColor="#a855f7"
+                      discBackground={WATCH_DISC_PALETTES[6]}
+                      size={46}
+                      mentorName="Peer 3"
+                      stateMachineName="Character"
+                    />
+                    <div className="text-[11px]">
+                      <div className="font-bold text-white">Min</div>
+                      <div className="text-[10px] text-purple-400">Lv.2 Sync</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
               <div className="mt-8">
                 <button
@@ -940,6 +1479,7 @@ export function WatchHoneycomb() {
             Proactive Level Diagnosis · Human-Supervised Mentorship
           </div>
         </footer>
+      </div>
       </div>
 
       {/* COMPACT MENTOR GREETING & ENROLL MODAL (When clicking any mentor bubble on the home screen) */}
