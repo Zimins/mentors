@@ -111,6 +111,29 @@ export interface ChatAttachment {
   previewUrl?: string;
 }
 
+export interface VisualDiagramStep {
+  badge: string;
+  title: string;
+  detail: string;
+  color: string;
+}
+
+export interface VisualComparisonItem {
+  label: string;
+  badExample?: string;
+  goodExample: string;
+  note?: string;
+}
+
+export interface VisualCardSpec {
+  badge: string;
+  title: string;
+  subtitle: string;
+  steps: VisualDiagramStep[];
+  comparisons?: VisualComparisonItem[];
+  footerTakeaway: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'mentor';
@@ -121,6 +144,7 @@ export interface ChatMessage {
   assessedLevel?: StudentLevel;
   recommendedMaterialType?: LearningMaterialType;
   learningMaterial?: LearningMaterialProposal | null;
+  visualCard?: VisualCardSpec;
   scene3d?: Scene3DSpec | null;
   quiz?: QuizQuestion | null;
   candyDelta?: number;
@@ -128,6 +152,16 @@ export interface ChatMessage {
   suggestedFollowUps?: string[];
   proactiveBadge?: string;
   modelUsed?: string;
+}
+
+export interface AvatarPartsConfig {
+  archetype: 'human' | 'mascot';
+  hairStyle: string;
+  headwear: string;
+  eyewear: 'glasses' | 'none';
+  outfit: string;
+  charm: string;
+  discIndex: number;
 }
 
 export interface MentorConfig {
@@ -145,6 +179,11 @@ export interface MentorConfig {
   systemPersona: string;
   starterPrompts: string[];
   defaultScene3d: Scene3DSpec;
+  isCustom?: boolean;
+  createdAt?: string;
+  discBackground?: string;
+  customChannels?: string[];
+  avatarParts?: AvatarPartsConfig;
 }
 
 export interface ShopItem {

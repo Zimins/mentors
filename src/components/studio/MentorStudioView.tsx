@@ -34,8 +34,10 @@ import type { CrossMentorNudgeResponse } from '@/app/api/mentor/proactive-nudge/
 import { RiveAvatar } from '@/components/avatar/RiveAvatar';
 import { Argon3DViewer } from '@/components/studio/Argon3DViewer';
 import { LearningMaterialPreviewCard } from '@/components/studio/LearningMaterialPreviewCard';
+import MentorMarkdown from '@/components/studio/MentorMarkdown';
 import { QuizDrawer } from '@/components/studio/QuizDrawer';
 import { useUserProgress } from '@/context/UserProgressContext';
+import { buildPreseededDemoMessages } from '@/data/demoConversations';
 import { MENTORS } from '@/data/mentors';
 import {
   buildAdaptiveLearningMaterial,
@@ -1202,7 +1204,7 @@ function buildClientFallbackResponse(
   });
 
   return {
-    replyText: `Great point in **#${channelTitle}**! As **${mentor.name}**, I diagnosed your level as **${LEVEL_BADGE_MAP[nextLevel].label}** and built a custom **${meta.label} (${meta.koreanHint})** right inside this chat bubble for **"${cleanTopic}"**.\n\n- **Why this format**: ${learningMaterial.pedagogicalReason}\n- **Interactive Mini-Preview**: Play with the live HTML/JS widget below or switch between **3D Preview · Mini Game · Small Test · Image Explanation** anytime!`,
+    replyText: `Great point in **#${channelTitle}**! As **${mentor.name}**, I diagnosed your level as **${LEVEL_BADGE_MAP[nextLevel].label}** and built a custom **${meta.label}** right inside this chat bubble for **"${cleanTopic}"**.\n\n- **Why this format**: ${learningMaterial.pedagogicalReason}\n- **Interactive Mini-Preview**: Play with the live HTML/JS widget below or switch between **3D Preview · Mini Game · Small Test · Image Explanation** anytime!`,
     avatarState: 'talking',
     assessedLevel: nextLevel,
     levelReason:
@@ -1355,31 +1357,21 @@ export function MentorStudioView({
     }, 3200);
   }, []);
 
-  // Ensure every curriculum channel initializes with the Mentor proactively speaking first (without pre-populated learning materials)
+  // Ensure every curriculum channel initializes with realistic pre-seeded conversation + domain-specific visual messages
   useEffect(() => {
     if (!activeChannel) return;
     setThreadsByChannel((prev) => {
       if (prev[activeChannel.id]) return prev;
 
-      const initialMsg: ChatMessage = {
-        id: `proactive-${activeChannel.id}`,
-        role: 'mentor',
-        text: activeChannel.proactiveGreeting,
-        timestamp: new Date().toLocaleTimeString('en-US', {
-          hour: '2-digit',
-          minute: '2-digit',
-        }),
-        avatarState: 'talking',
-        assessedLevel: savedLevel,
-        scene3d: activeChannel.scene3d,
-        proactiveBadge: `Proactive Welcome · #${activeChannel.slug}`,
-        suggestedFollowUps: activeChannel.starterPrompts,
-        modelUsed: 'gemini-4-argon',
-      };
+      const preseededMessages = buildPreseededDemoMessages(
+        activeMentor,
+        activeChannel,
+        savedLevel
+      );
       return {
         ...prev,
         [activeChannel.id]: {
-          messages: [initialMsg],
+          messages: preseededMessages,
           scene3d: activeChannel.scene3d,
           quiz: activeChannel.quiz,
           learningStepTitle: activeChannel.title,
@@ -1398,28 +1390,19 @@ export function MentorStudioView({
     }
 
     return {
-      messages: [
-        {
-          id: `proactive-${activeChannel.id}`,
-          role: 'mentor',
-          text: activeChannel.proactiveGreeting,
-          timestamp: 'Just now',
-          avatarState: 'talking',
-          assessedLevel: savedLevel,
-          scene3d: activeChannel.scene3d,
-          proactiveBadge: `Proactive Welcome · #${activeChannel.slug}`,
-          suggestedFollowUps: activeChannel.starterPrompts,
-          modelUsed: 'gemini-4-argon',
-        },
-      ],
+      messages: buildPreseededDemoMessages(
+        activeMentor,
+        activeChannel,
+        savedLevel
+      ),
       scene3d: activeChannel.scene3d,
       quiz: activeChannel.quiz,
       learningStepTitle: activeChannel.title,
       keyTakeaways: [activeChannel.summary],
     };
-  }, [threadsByChannel, activeChannel, savedLevel]);
+  }, [threadsByChannel, activeMentor, activeChannel, savedLevel]);
 
-  // Collect all Learning Materials for the Right Sidebar Collection Hub ("학습 자료 보관함")
+  // Collect Learning Materials added one by one during the session for the Right Sidebar
   const allMentorMaterials = useMemo<CollectedLearningMaterialItem[]>(() => {
     const items: CollectedLearningMaterialItem[] = [];
     for (const ch of curriculumChannels) {
@@ -1444,37 +1427,6 @@ export function MentorStudioView({
             });
           }
         }
-      } else {
-        const chDefaultMatType = getDefaultMaterialTypeForChannel(
-          ch.slug,
-          savedLevel
-        );
-        const chInitialMaterial = buildAdaptiveLearningMaterial({
-          mentorId: activeMentor.id,
-          mentorName: activeMentor.name,
-          roleTitle: activeMentor.roleTitle,
-          subject: activeMentor.subject,
-          accentColor: activeMentor.accentColor,
-          userMessage: ch.title,
-          assessedLevel: savedLevel,
-          materialType: chDefaultMatType,
-          learningStepTitle: ch.title,
-          scene3d: ch.scene3d,
-          quiz: ch.quiz,
-        });
-        items.push({
-          id: `${ch.id}::proactive-${ch.id}`,
-          messageId: `proactive-${ch.id}`,
-          channelId: ch.id,
-          channelSlug: ch.slug,
-          channelTitle: ch.title,
-          timestamp: 'Course Default',
-          assessedLevel: savedLevel,
-          material: chInitialMaterial,
-          scene3d: ch.scene3d,
-          quiz: ch.quiz,
-          proactiveBadge: `Proactive Welcome · #${ch.slug}`,
-        });
       }
     }
     return items.reverse();
@@ -1484,25 +1436,15 @@ export function MentorStudioView({
     currentThread,
     threadsByChannel,
     assessedLevel,
-    savedLevel,
-    activeMentor,
   ]);
 
   const scopedMaterials = useMemo(() => {
-    if (materialScope === 'channel') {
-      return allMentorMaterials.filter(
-        (item) => item.channelId === activeChannel.id
-      );
-    }
-    return allMentorMaterials;
-  }, [allMentorMaterials, materialScope, activeChannel.id]);
-
-  const filteredMaterials = useMemo(() => {
-    if (materialFilter === 'all') return scopedMaterials;
-    return scopedMaterials.filter(
-      (item) => item.material.type === materialFilter
+    return allMentorMaterials.filter(
+      (item) => item.channelId === activeChannel.id
     );
-  }, [scopedMaterials, materialFilter]);
+  }, [allMentorMaterials, activeChannel.id]);
+
+  const filteredMaterials = scopedMaterials;
 
   const activeCollectedMaterial = useMemo<CollectedLearningMaterialItem | null>(() => {
     if (filteredMaterials.length === 0) return null;
@@ -1689,7 +1631,7 @@ export function MentorStudioView({
 
     setPendingAttachments((prev) => [...prev, ...newlyRead]);
     showCandyNotification(
-      `📎 파일 ${newlyRead.length}개 첨부됨: ${newlyRead.map((f) => f.name).join(', ')}`
+      `📎 Attached ${newlyRead.length} file(s): ${newlyRead.map((f) => f.name).join(', ')}`
     );
 
     if (fileInputRef.current) {
@@ -1701,7 +1643,7 @@ export function MentorStudioView({
     setPendingAttachments((prev) => prev.filter((item) => item.id !== id));
   };
 
-  // Course-Driven Proactive Mentor Nudge ("내가 배우고 있는 코스에 따른 Proactive 메시지")
+  // Course-Driven Proactive Mentor Nudge
   const handleMentorSpeakFirst = (preferredType?: ProactiveNudgeType) => {
     if (isLoading) return;
 
@@ -1802,7 +1744,7 @@ export function MentorStudioView({
 
     const promptText =
       rawPrompt ||
-      `첨부한 학습 파일(${attachmentsToSend.map((a) => a.name).join(', ')})을 #${activeChannel.slug} (${activeChannel.title}) 코스 맥락에서 분석하고 핵심 학습 자료를 만들어 주세요.`;
+      `Please analyze the attached file(s) (${attachmentsToSend.map((a) => a.name).join(', ')}) in the context of #${activeChannel.slug} (${activeChannel.title}) and generate interactive learning materials.`;
 
     if (isUsingComposer) {
       setInputPrompt('');
@@ -1883,7 +1825,7 @@ export function MentorStudioView({
       addCandy(participationCandy);
       showCandyNotification(
         attachmentsToSend.length > 0
-          ? `+${participationCandy} 🍬 파일 기반 질문 & 학습 자료 생성 완료!`
+          ? `+${participationCandy} 🍬 File analyzed & learning material added to sidebar!`
           : `+${participationCandy} 🍬 Candy for active learning in #${activeChannel.slug}!`
       );
 
@@ -2238,8 +2180,8 @@ export function MentorStudioView({
       materialType: crossMentorNudge.recommendedFormat,
       learningStepTitle: `${crossMentorNudge.struggledConcept} (${
         crossMentorNudge.recommendedFormat === '3d_preview'
-          ? '맞춤 3D Preview'
-          : '맞춤 인터랙티브 미니게임'
+          ? 'Custom 3D Preview'
+          : 'Custom Interactive Mini Game'
       })`,
       scene3d: matchedChannel.scene3d,
       quiz: matchedChannel.quiz,
@@ -2250,11 +2192,11 @@ export function MentorStudioView({
     const welcomeMsg: ChatMessage = {
       id: welcomeMsgId,
       role: 'mentor',
-      text: `${crossMentorNudge.channelFollowUpMessage || crossMentorNudge.bannerMessage}\n\n👇 아래에 너를 위해 새로 준비한 **${
+      text: `${crossMentorNudge.channelFollowUpMessage || crossMentorNudge.bannerMessage}\n\n👇 I added a custom **${
         crossMentorNudge.recommendedFormat === '3d_preview'
-          ? '인터랙티브 3D Preview'
-          : '맞춤 미니게임 (Mini Game)'
-      }** (**${crossMentorNudge.struggledConcept}**)을 바로 띄워뒀어! 직접 조작해보면서 이어서 공부해 보자!`,
+          ? 'Interactive 3D Preview'
+          : 'Playable Mini Game'
+      }** (**${crossMentorNudge.struggledConcept}**) to your Right Sidebar so we can explore it hands-on!`,
       timestamp: new Date().toLocaleTimeString('en-US', {
         hour: '2-digit',
         minute: '2-digit',
@@ -2266,7 +2208,7 @@ export function MentorStudioView({
       recommendedMaterialType: crossMentorNudge.recommendedFormat,
       learningMaterial: customMaterial,
       candyEarned: rewardCandy,
-      proactiveBadge: `🔔 상단 알림 초청 수락 · 맞춤 ${
+      proactiveBadge: `🔔 Cross-Mentor Nudge · Custom ${
         crossMentorNudge.recommendedFormat === '3d_preview'
           ? '3D Preview'
           : 'Mini Game'
@@ -2293,11 +2235,11 @@ export function MentorStudioView({
           learningStepTitle: matchedChannel.title,
           keyTakeaways: [
             matchedChannel.summary,
-            `지난번 헷갈렸던 "${crossMentorNudge.struggledConcept}" 맞춤 ${
+            `Generated custom ${
               crossMentorNudge.recommendedFormat === '3d_preview'
                 ? '3D Preview'
-                : '미니게임'
-            } 생성 완료`,
+                : 'Mini Game'
+            } for "${crossMentorNudge.struggledConcept}"`,
           ],
         },
       };
@@ -2306,11 +2248,11 @@ export function MentorStudioView({
     setSelectedMaterialId(`${matchedChannel.id}::${welcomeMsgId}`);
     addCandy(rewardCandy);
     showCandyNotification(
-      `+${rewardCandy} 🍬 ${targetMentor.name} 멘토의 맞춤 ${
+      `+${rewardCandy} 🍬 Switched to ${targetMentor.name}'s custom ${
         crossMentorNudge.recommendedFormat === '3d_preview'
           ? '3D Preview'
-          : '게임'
-      } 세션으로 이동했습니다!`
+          : 'Mini Game'
+      } session!`
     );
     triggerTemporaryAvatarState('happy', 3500);
 
@@ -2768,15 +2710,15 @@ export function MentorStudioView({
               type="button"
               onClick={() => triggerCrossMentorNotification()}
               disabled={isCrossNudgeLoading}
-              title="현재 보고 있는 멘토 외의 다른 멘토가 AI로 상황을 판단해 상단 알림을 보냅니다"
+              title="Another AI Mentor evaluates your learning context and sends a top notification"
               className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-pink-500/20 via-purple-500/20 to-amber-500/20 hover:from-pink-500/30 hover:to-amber-500/30 border border-pink-400/40 text-pink-200 text-[11px] sm:text-xs font-extrabold transition cursor-pointer shadow-[0_0_15px_rgba(236,72,153,0.2)]"
             >
               <Bell className="w-3.5 h-3.5 text-pink-400 animate-pulse" />
-              <span className="hidden sm:inline">타 멘토 AI 알림</span>
-              <span className="sm:hidden">알림</span>
+              <span className="hidden sm:inline">AI Mentor Nudge</span>
+              <span className="sm:hidden">Nudge</span>
             </button>
 
-            {/* Mobile/Tablet Toggle for Learning Materials Collection Hub */}
+            {/* Mobile/Tablet Toggle for Learning Materials Sidebar */}
             <button
               type="button"
               onClick={() => setIsMobileLabOpen((v) => !v)}
@@ -2784,14 +2726,14 @@ export function MentorStudioView({
             >
               <FolderOpen className="w-3.5 h-3.5 text-sky-400" />
               <span>
-                자료함 ({scopedMaterials.length + uploadedFilesInScope.length})
+                Materials ({scopedMaterials.length + uploadedFilesInScope.length})
               </span>
             </button>
           </div>
         </header>
 
         {/* =================================================================
-            CROSS-MENTOR AI PROACTIVE TOP NOTIFICATION BANNER (상단 알림)
+            CROSS-MENTOR AI PROACTIVE TOP NOTIFICATION BANNER
             Sent by a mentor OTHER than the mentor the user is currently viewing!
            ================================================================= */}
         {isCrossNudgeVisible && crossMentorNudge && (
@@ -2831,7 +2773,7 @@ export function MentorStudioView({
                     style={{
                       backgroundColor: nudgeSenderMentor.accentColor,
                     }}
-                    title="타 멘토 상단 알림"
+                    title="Cross-Mentor AI Notification"
                   >
                     🔔
                   </span>
@@ -2850,7 +2792,7 @@ export function MentorStudioView({
                     <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-200 border border-amber-400/30">
                       {crossMentorNudge.recommendedFormat === '3d_preview'
                         ? '🧊 3D Preview'
-                        : '🎮 미니게임'}
+                        : '🎮 Mini Game'}
                     </span>
                     <span className="text-[10px] text-slate-400 truncate">
                       #{crossMentorNudge.targetChannelSlug} · {crossMentorNudge.struggledConcept}
@@ -2883,8 +2825,8 @@ export function MentorStudioView({
                   )}
                   <span className="whitespace-nowrap">
                     {crossMentorNudge.recommendedFormat === '3d_preview'
-                      ? '3D 열기'
-                      : '게임 열기'}
+                      ? 'Open 3D'
+                      : 'Open Game'}
                   </span>
                 </button>
 
@@ -2892,7 +2834,7 @@ export function MentorStudioView({
                   type="button"
                   onClick={() => triggerCrossMentorNotification()}
                   disabled={isCrossNudgeLoading}
-                  title="다른 멘토의 AI 상단 알림 보기"
+                  title="Cycle to another Mentor AI Nudge"
                   className="p-1.5 rounded-lg bg-white/[0.07] hover:bg-white/[0.14] border border-white/10 text-slate-300 transition cursor-pointer"
                 >
                   <RefreshCw
@@ -2905,7 +2847,7 @@ export function MentorStudioView({
                 <button
                   type="button"
                   onClick={() => setIsCrossNudgeVisible(false)}
-                  title="상단 알림 닫기"
+                  title="Dismiss notification"
                   className="p-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.12] text-slate-400 hover:text-white transition cursor-pointer"
                 >
                   <X className="w-3.5 h-3.5" />
@@ -2956,6 +2898,8 @@ export function MentorStudioView({
 
           {currentThread.messages.map((msg) => {
             const isMentor = msg.role === 'mentor';
+            const isInitialWelcomeMsg =
+              msg.id === `proactive-${activeChannel.id}`;
             return (
               <div key={msg.id} className="flex items-start gap-3.5 group">
                 {isMentor ? (
@@ -3016,14 +2960,11 @@ export function MentorStudioView({
                     )}
                   </div>
 
-                  <div
-                    className={`mt-1.5 text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-line rounded-2xl px-4 py-3 border ${
-                      msg.proactiveBadge
-                        ? 'bg-slate-900/85 border-emerald-400/25 shadow-[0_4px_24px_rgba(16,185,129,0.07)]'
-                        : 'bg-slate-900/65 border-white/[0.07]'
-                    }`}
-                  >
-                    {msg.text}
+                  <div className="mt-1 text-xs sm:text-sm text-slate-200 leading-relaxed">
+                    <MentorMarkdown
+                      content={msg.text}
+                      accentColor={activeMentor.accentColor}
+                    />
                   </div>
 
                   {/* User Uploaded File Attachments Card */}
@@ -3048,8 +2989,8 @@ export function MentorStudioView({
                             </div>
                             <p className="text-[10px] text-sky-300/90 mt-0.5">
                               {att.textContent
-                                ? `텍스트 내용 추출됨 (${att.textContent.length.toLocaleString()}자) · 우측 자료함에 보관됨`
-                                : '첨부 파일 메타데이터 전달됨 · 우측 자료함에 보관됨'}
+                                ? `Extracted ${att.textContent.length.toLocaleString()} chars · Added to Sidebar`
+                                : 'File attached · Added to Sidebar'}
                             </p>
                           </div>
                         </div>
@@ -3057,52 +2998,156 @@ export function MentorStudioView({
                     </div>
                   )}
 
-                  {/* Teacher's Inline JS/HTML Interactive Mini-Preview (Gemini 4 Argon Autonomous Material) */}
-                  {isMentor && msg.learningMaterial && (
-                    <div>
-                      <LearningMaterialPreviewCard
-                        material={msg.learningMaterial}
-                        mentorId={activeMentor.id}
-                        mentorName={activeMentor.name}
-                        roleTitle={activeMentor.roleTitle}
-                        subject={activeMentor.subject}
-                        accentColor={activeMentor.accentColor}
-                        assessedLevel={msg.assessedLevel || assessedLevel}
-                        scene3d={msg.scene3d || currentThread.scene3d}
-                        quiz={
-                          msg.quiz || currentThread.quiz || activeChannel.quiz
-                        }
-                        onClaimCandyReward={(amount, reason) => {
-                          addCandy(amount);
-                          triggerTemporaryAvatarState('happy', 3800);
-                          showCandyNotification(`+${amount} 🍬 ${reason}`);
-                        }}
-                        onRequestRegenerateFormat={(type, reqMode) => {
-                          const meta = MATERIAL_TYPE_META[type];
-                          handleSendMessage(
-                            `Create a custom ${meta.label} (${meta.koreanHint}) for #${activeChannel.slug} (${activeChannel.title}) calibrated to my ${LEVEL_BADGE_MAP[assessedLevel].label} level!`,
-                            reqMode
-                          );
-                        }}
-                      />
-                      <div className="mt-1.5 flex items-center justify-end">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedMaterialId(`${activeChannel.id}::${msg.id}`);
-                            setIsMobileLabOpen(true);
+                  {/* Inline Domain-Specific Visualization Card */}
+                  {isMentor && !isInitialWelcomeMsg && msg.visualCard && (
+                    <div
+                      className="mt-2.5 p-3.5 rounded-2xl bg-slate-950/85 border border-white/10 shadow-lg space-y-2.5"
+                      style={{
+                        borderColor: `${activeMentor.accentColor}40`,
+                      }}
+                    >
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <span
+                          className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold tracking-wide uppercase"
+                          style={{
+                            backgroundColor: `${activeMentor.accentColor}22`,
+                            color: activeMentor.accentColor,
+                            border: `1px solid ${activeMentor.accentColor}45`,
                           }}
-                          className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-300 hover:text-sky-200 px-2.5 py-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 border border-sky-400/25 transition cursor-pointer"
                         >
-                          <FolderOpen className="w-3 h-3 text-sky-400" />
-                          <span>우측 학습 자료함에서 보기</span>
-                        </button>
+                          <Sparkles className="w-3 h-3" />
+                          {msg.visualCard.badge}
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-400">
+                          {msg.visualCard.subtitle}
+                        </span>
+                      </div>
+
+                      <p className="text-xs font-extrabold text-white">
+                        {msg.visualCard.title}
+                      </p>
+
+                      {/* 3-Step Visual Pipeline */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        {msg.visualCard.steps.map((step, sIdx) => (
+                          <div
+                            key={`${msg.id}-step-${sIdx}`}
+                            className="p-2.5 rounded-xl bg-slate-900/90 border border-white/10 flex flex-col justify-between gap-1"
+                          >
+                            <div className="flex items-center justify-between gap-1.5">
+                              <span className="text-[11px] font-extrabold text-white truncate">
+                                {step.title}
+                              </span>
+                              <span
+                                className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-white/5 text-slate-300 shrink-0"
+                                style={{ color: step.color || activeMentor.accentColor }}
+                              >
+                                {step.badge}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-slate-400 leading-snug">
+                              {step.detail}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Optional Before/After or Side-by-Side Comparison */}
+                      {msg.visualCard.comparisons &&
+                        msg.visualCard.comparisons.length > 0 && (
+                          <div className="space-y-1.5 pt-1">
+                            {msg.visualCard.comparisons.map((cmp, cIdx) => (
+                              <div
+                                key={`${msg.id}-cmp-${cIdx}`}
+                                className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px]"
+                              >
+                                {cmp.badExample && (
+                                  <div className="px-2.5 py-1.5 rounded-lg bg-rose-500/10 border border-rose-500/25 text-rose-200 truncate">
+                                    <span className="font-extrabold text-rose-300 mr-1">
+                                      [{cmp.label}]
+                                    </span>
+                                    {cmp.badExample}
+                                  </div>
+                                )}
+                                <div className="px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-200 truncate">
+                                  <span className="font-extrabold text-emerald-300 mr-1">
+                                    ✓ {cmp.badExample ? '' : `[${cmp.label}] `}
+                                  </span>
+                                  {cmp.goodExample}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                      <div className="pt-1 flex items-center justify-between gap-2 text-[10px] text-slate-300 border-t border-white/5">
+                        <span className="font-semibold text-amber-300/90 truncate">
+                          💡 {msg.visualCard.footerTakeaway}
+                        </span>
                       </div>
                     </div>
                   )}
 
-                  {/* Suggested Follow-up Chips */}
+                  {/* Compact "Added to Learning Materials" Card (opens in Right Sidebar) — never shown on the initial greeting message */}
+                  {isMentor && !isInitialWelcomeMsg && msg.learningMaterial && (
+                    <div className="mt-2">
+                      {(() => {
+                        const meta = MATERIAL_TYPE_META[msg.learningMaterial.type];
+                        const itemId = `${activeChannel.id}::${msg.id}`;
+                        const isCurrentlySelected =
+                          activeCollectedMaterial?.id === itemId;
+                        return (
+                          <div
+                            onClick={() => {
+                              setSelectedMaterialId(itemId);
+                              setIsMobileLabOpen(true);
+                            }}
+                            className={`p-3 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-3 ${
+                              isCurrentlySelected
+                                ? 'bg-sky-500/15 border-sky-400/50 shadow-[0_0_20px_rgba(56,189,248,0.12)]'
+                                : 'bg-slate-900/80 hover:bg-slate-900 border-white/10 hover:border-sky-400/40'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span
+                                className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-extrabold text-slate-950"
+                                style={{
+                                  backgroundColor: meta.badgeColor,
+                                }}
+                              >
+                                <span>{meta.shortLabel}</span>
+                              </span>
+                              <div className="min-w-0">
+                                <p className="text-xs font-extrabold text-white truncate">
+                                  {msg.learningMaterial.title}
+                                </p>
+                                <p className="text-[11px] text-slate-400 truncate">
+                                  Added to Right Sidebar · {msg.learningMaterial.pedagogicalReason}
+                                </p>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedMaterialId(itemId);
+                                setIsMobileLabOpen(true);
+                              }}
+                              className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/40 text-[11px] font-extrabold text-sky-200 transition cursor-pointer"
+                            >
+                              <FolderOpen className="w-3.5 h-3.5 text-sky-300" />
+                              <span>Open in Sidebar</span>
+                            </button>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+
+                  {/* Suggested Follow-up Chips — never shown on the initial greeting message */}
                   {isMentor &&
+                    !isInitialWelcomeMsg &&
                     msg.suggestedFollowUps &&
                     msg.suggestedFollowUps.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1.5">
@@ -3147,7 +3192,7 @@ export function MentorStudioView({
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
               <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 shrink-0 mr-0.5">
-                학습 자료 생성 모드:
+                Add Material:
               </span>
 
               <button
@@ -3162,7 +3207,7 @@ export function MentorStudioView({
                 title="Gemini 4 Argon automatically diagnoses your level and picks 3D Preview, Mini Game, Small Test, or Image Explanation"
               >
                 <Sparkles className="w-3 h-3 text-amber-300" />
-                <span>Auto (수준별 추천)</span>
+                <span>Auto</span>
               </button>
 
               <button
@@ -3228,7 +3273,7 @@ export function MentorStudioView({
                 }`}
               >
                 <ClipboardCheck className="w-3 h-3 text-amber-400" />
-                <span>Small Test</span>
+                <span>Small Test / Quiz</span>
               </button>
 
               <button
@@ -3273,7 +3318,7 @@ export function MentorStudioView({
           {pendingAttachments.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-xl bg-slate-900/90 border border-sky-400/30">
               <span className="text-[10px] font-extrabold uppercase tracking-wider text-sky-300 mr-1">
-                첨부 파일 ({pendingAttachments.length}):
+                Attached Files ({pendingAttachments.length}):
               </span>
               {pendingAttachments.map((att) => (
                 <div
@@ -3291,7 +3336,7 @@ export function MentorStudioView({
                     type="button"
                     onClick={() => handleRemovePendingAttachment(att.id)}
                     className="text-slate-400 hover:text-rose-300 transition cursor-pointer"
-                    title="첨부 취소"
+                    title="Remove attachment"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -3322,22 +3367,22 @@ export function MentorStudioView({
               type="button"
               disabled={isLoading}
               onClick={() => fileInputRef.current?.click()}
-              title="학습 파일 첨부 (.txt, .md, .py, .js, .ts, .csv, .json, .pdf 등)"
+              title="Upload study file (.txt, .md, .py, .js, .ts, .csv, .json, .pdf, etc.)"
               className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-white/[0.06] hover:bg-sky-500/20 border border-white/15 hover:border-sky-400/40 text-xs font-bold text-slate-200 hover:text-sky-200 transition cursor-pointer"
             >
               <Paperclip className="w-3.5 h-3.5 text-sky-400" />
-              <span className="hidden sm:inline">파일 첨부</span>
+              <span className="hidden sm:inline">Upload File</span>
             </button>
 
             {/* Planned Multimodal Upload Indicators (Voice / Image / Video - Next Priority) */}
             <div
               className="hidden lg:inline-flex items-center gap-1 px-2.5 py-2 rounded-xl bg-white/[0.02] border border-white/[0.06] text-[10px] text-slate-500 shrink-0"
-              title="음성, 이미지, 영상 업로드는 다음 순위로 지원 예정입니다"
+              title="Voice, Image, and Video uploads are scheduled as next priority"
             >
               <Mic className="w-3 h-3 text-slate-500" />
               <ImageIcon className="w-3 h-3 text-slate-500" />
               <Video className="w-3 h-3 text-slate-500" />
-              <span>음성·이미지·영상 추후 지원</span>
+              <span>Voice · Image · Video Soon</span>
             </div>
 
             <input
@@ -3347,8 +3392,8 @@ export function MentorStudioView({
               disabled={isLoading}
               placeholder={
                 pendingAttachments.length > 0
-                  ? `첨부한 파일(${pendingAttachments.length}개)에 대해 ${activeMentor.name}에게 질문하거나 바로 전송하세요...`
-                  : `Message #${activeChannel.slug} 또는 학습 파일을 첨부해 질문하세요...`
+                  ? `Ask ${activeMentor.name} about your ${pendingAttachments.length} attached file(s) or press Send...`
+                  : `Message #${activeChannel.slug} or upload a file...`
               }
               className="flex-1 bg-slate-900 border border-white/15 focus:border-sky-400 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-white placeholder:text-slate-500 focus:outline-none"
             />
@@ -3376,16 +3421,16 @@ export function MentorStudioView({
       )}
 
       {/* =====================================================================
-          COLUMN 4: LEARNING MATERIALS COLLECTION HUB (학습 자료 보관함 / 모아보기)
+          COLUMN 4: LEARNING MATERIALS SIDEBAR (100% English · One-by-One Feed)
          ===================================================================== */}
       <aside
         className={`${
           isMobileLabOpen
             ? 'fixed right-0 top-14 bottom-0 z-40 flex w-[90vw] max-w-[460px] shadow-2xl'
-            : 'hidden xl:flex w-[450px]'
+            : 'hidden xl:flex w-[460px]'
         } shrink-0 h-full border-l border-white/[0.08] bg-[#080b14] flex-col overflow-hidden`}
       >
-        {/* Top Header: Collection Hub Title + Scope Toggle */}
+        {/* Top Header: Title + 1-Click Add Buttons */}
         <div className="p-3.5 border-b border-white/[0.08] bg-slate-950/70 space-y-2.5 shrink-0">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
@@ -3395,14 +3440,14 @@ export function MentorStudioView({
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
                   <h2 className="text-xs font-black text-white truncate">
-                    학습 자료 보관함
+                    Learning Materials
                   </h2>
                   <span className="px-1.5 py-0.5 rounded-full bg-sky-500/15 border border-sky-400/30 text-[10px] font-black text-sky-300">
-                    {scopedMaterials.length}
+                    {scopedMaterials.length + uploadedFilesInScope.length}
                   </span>
                 </div>
                 <p className="text-[10px] text-slate-400 truncate">
-                  코스에서 생성된 3D·미니게임·테스트·도식 및 첨부 파일 모아보기
+                  Added one by one as you learn in #{activeChannel.slug}
                 </p>
               </div>
             </div>
@@ -3417,350 +3462,304 @@ export function MentorStudioView({
             </button>
           </div>
 
-          {/* Scope Toggle: Current Course vs All Mentor Courses */}
-          <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-900/90 border border-white/[0.07]">
-            <button
-              type="button"
-              onClick={() => setMaterialScope('channel')}
-              className={`py-1.5 px-2 rounded-lg text-[11px] font-bold transition cursor-pointer truncate ${
-                materialScope === 'channel'
-                  ? 'bg-sky-500/20 text-sky-200 border border-sky-400/40'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              현재 코스 (#{activeChannel.slug})
-            </button>
-            <button
-              type="button"
-              onClick={() => setMaterialScope('mentor')}
-              className={`py-1.5 px-2 rounded-lg text-[11px] font-bold transition cursor-pointer truncate ${
-                materialScope === 'mentor'
-                  ? 'bg-sky-500/20 text-sky-200 border border-sky-400/40'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              {activeMentor.name} 전체 ({allMentorMaterials.length})
-            </button>
-          </div>
-
-          {/* Type Filter Tabs */}
+          {/* Quick Add Bar: Add 3D, Mini Game, Quiz, Visual Guide, or File one by one */}
           <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pt-0.5">
-            {(
-              [
-                { id: 'all', label: '전체', count: scopedMaterials.length },
-                {
-                  id: '3d_preview',
-                  label: '🧊 3D 구조',
-                  count: scopedMaterials.filter(
-                    (m) => m.material.type === '3d_preview'
-                  ).length,
-                },
-                {
-                  id: 'mini_game',
-                  label: '🎮 미니 게임',
-                  count: scopedMaterials.filter(
-                    (m) => m.material.type === 'mini_game'
-                  ).length,
-                },
-                {
-                  id: 'small_test',
-                  label: '📝 미니 테스트',
-                  count: scopedMaterials.filter(
-                    (m) => m.material.type === 'small_test'
-                  ).length,
-                },
-                {
-                  id: 'image_explanation',
-                  label: '🖼️ 도식·해설',
-                  count: scopedMaterials.filter(
-                    (m) => m.material.type === 'image_explanation'
-                  ).length,
-                },
-              ] as {
-                id: 'all' | LearningMaterialType;
-                label: string;
-                count: number;
-              }[]
-            ).map((tab) => {
-              const active = materialFilter === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setMaterialFilter(tab.id)}
-                  className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold border transition cursor-pointer ${
-                    active
-                      ? 'bg-white text-slate-950 border-white'
-                      : 'bg-white/[0.04] text-slate-400 border-white/10 hover:text-white'
-                  }`}
-                >
-                  <span>{tab.label}</span>
-                  <span
-                    className={`text-[9px] px-1 rounded-full ${
-                      active
-                        ? 'bg-slate-900/20 text-slate-950'
-                        : 'bg-white/10 text-slate-300'
-                    }`}
-                  >
-                    {tab.count}
-                  </span>
-                </button>
-              );
-            })}
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={() =>
+                handleSendMessage(
+                  `Build an interactive 3D Preview for #${activeChannel.slug} (${activeChannel.title})!`,
+                  'generate_3d'
+                )
+              }
+              className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-500/15 hover:bg-sky-500/25 border border-sky-400/30 text-[10px] font-bold text-sky-200 transition cursor-pointer"
+            >
+              <Box className="w-3 h-3 text-sky-400" />
+              <span>+ 3D</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={() =>
+                handleSendMessage(
+                  `Create a playable JS/HTML Mini Game for #${activeChannel.slug} (${activeChannel.title})!`,
+                  'generate_mini_game'
+                )
+              }
+              className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-400/30 text-[10px] font-bold text-emerald-200 transition cursor-pointer"
+            >
+              <Gamepad2 className="w-3 h-3 text-emerald-400" />
+              <span>+ Game</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={() =>
+                handleSendMessage(
+                  `Make an interactive Small Test & Quiz for #${activeChannel.slug} (${activeChannel.title})!`,
+                  'generate_small_test'
+                )
+              }
+              className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/30 text-[10px] font-bold text-amber-200 transition cursor-pointer"
+            >
+              <ClipboardCheck className="w-3 h-3 text-amber-400" />
+              <span>+ Quiz</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={() =>
+                handleSendMessage(
+                  `Create an interactive Image Explanation diagram for #${activeChannel.slug} (${activeChannel.title})!`,
+                  'generate_image_explanation'
+                )
+              }
+              className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-500/15 hover:bg-purple-500/25 border border-purple-400/30 text-[10px] font-bold text-purple-200 transition cursor-pointer"
+            >
+              <ImageIcon className="w-3 h-3 text-purple-400" />
+              <span>+ Visual</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={() => fileInputRef.current?.click()}
+              className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] border border-white/15 text-[10px] font-bold text-slate-200 transition cursor-pointer"
+            >
+              <Paperclip className="w-3 h-3 text-sky-400" />
+              <span>+ File</span>
+            </button>
           </div>
         </div>
 
-        {/* Scrollable Content: Collected Materials List + Selected Material Viewer + Uploaded Study Files */}
+        {/* Scrollable Content: Empty State OR One-by-One Added Items + Interactive Viewer */}
         <div className="flex-1 overflow-y-auto p-3.5 space-y-4">
-          {/* Section 1: Collected Learning Materials List */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                <Layers className="w-3.5 h-3.5 text-sky-400" />
-                <span>수집된 학습 자료 목록 ({filteredMaterials.length})</span>
-              </span>
-              {activeCollectedMaterial && (
-                <span className="text-[10px] text-slate-500">
-                  카드를 클릭해 아래에서 열람
-                </span>
-              )}
-            </div>
-
-            {filteredMaterials.length === 0 ? (
-              <div className="p-4 rounded-2xl bg-slate-900/60 border border-white/[0.07] text-center space-y-2.5">
-                <p className="text-xs font-bold text-slate-300">
-                  현재 조건에 해당하는 학습 자료가 아직 없습니다.
+          {filteredMaterials.length === 0 && uploadedFilesInScope.length === 0 ? (
+            <div className="p-6 rounded-2xl bg-slate-900/50 border border-white/[0.07] text-center space-y-3 my-4">
+              <div className="w-11 h-11 rounded-2xl bg-sky-500/10 border border-sky-400/25 flex items-center justify-center mx-auto">
+                <Layers className="w-5 h-5 text-sky-400" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-extrabold text-white">
+                  No learning materials added yet
                 </p>
                 <p className="text-[11px] text-slate-400 leading-relaxed">
-                  채팅창에서 질문을 보내거나 아래 버튼으로{' '}
-                  <strong className="text-white">#{activeChannel.slug}</strong>{' '}
-                  코스의 맞춤 학습 자료를 생성해 모아보세요.
+                  Each time you chat with <strong className="text-slate-200">{activeMentor.name}</strong> or click{' '}
+                  <strong className="text-sky-300">+ 3D</strong>,{' '}
+                  <strong className="text-emerald-300">+ Game</strong>,{' '}
+                  <strong className="text-amber-300">+ Quiz</strong>, or{' '}
+                  <strong className="text-purple-300">+ Visual</strong> above, new materials and quizzes will appear here one by one.
                 </p>
-                <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1">
-                  <button
-                    type="button"
-                    disabled={isLoading}
-                    onClick={() =>
-                      handleSendMessage(
-                        `Build an interactive 3D Preview for #${activeChannel.slug} (${activeChannel.title})!`,
-                        'generate_3d'
-                      )
-                    }
-                    className="px-2.5 py-1.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-400/30 text-[11px] font-bold text-sky-200 cursor-pointer transition"
-                  >
-                    🧊 3D 구조 생성
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isLoading}
-                    onClick={() =>
-                      handleSendMessage(
-                        `Create a playable JS/HTML Mini Game for #${activeChannel.slug} (${activeChannel.title})!`,
-                        'generate_mini_game'
-                      )
-                    }
-                    className="px-2.5 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-400/30 text-[11px] font-bold text-emerald-200 cursor-pointer transition"
-                  >
-                    🎮 미니 게임 생성
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isLoading}
-                    onClick={() =>
-                      handleSendMessage(
-                        `Make an interactive Small Test for #${activeChannel.slug} (${activeChannel.title})!`,
-                        'generate_small_test'
-                      )
-                    }
-                    className="px-2.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/30 text-[11px] font-bold text-amber-200 cursor-pointer transition"
-                  >
-                    📝 미니 테스트 생성
-                  </button>
-                </div>
               </div>
-            ) : (
-              <div className="space-y-1.5 max-h-[230px] overflow-y-auto pr-0.5">
-                {filteredMaterials.map((item) => {
-                  const meta = MATERIAL_TYPE_META[item.material.type];
-                  const isSelected = activeCollectedMaterial?.id === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setSelectedMaterialId(item.id)}
-                      className={`w-full text-left p-2.5 rounded-xl border transition cursor-pointer flex items-start gap-2.5 ${
-                        isSelected
-                          ? 'bg-sky-500/15 border-sky-400/50 shadow-[0_0_20px_rgba(56,189,248,0.12)]'
-                          : 'bg-slate-900/70 hover:bg-slate-900 border-white/[0.07] hover:border-white/20'
-                      }`}
-                    >
-                      <span
-                        className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[10px] font-extrabold text-slate-950"
-                        style={{
-                          backgroundColor: meta.badgeColor,
-                          borderColor: meta.badgeColor,
-                        }}
-                      >
-                        <span>{meta.shortLabel}</span>
-                      </span>
+            </div>
+          ) : (
+            <>
+              {/* Added Learning Materials List (1 by 1) */}
+              {filteredMaterials.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5 text-sky-400" />
+                      <span>Added Materials ({filteredMaterials.length})</span>
+                    </span>
+                    <span className="text-[10px] text-slate-500">
+                      Select an item to interact
+                    </span>
+                  </div>
 
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-1.5">
-                          <p className="text-xs font-extrabold text-white truncate">
-                            {item.material.title}
-                          </p>
+                  <div className="space-y-1.5 max-h-[190px] overflow-y-auto pr-0.5">
+                    {filteredMaterials.map((item, idx) => {
+                      const meta = MATERIAL_TYPE_META[item.material.type];
+                      const isSelected = activeCollectedMaterial?.id === item.id;
+                      const itemNumber = filteredMaterials.length - idx;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setSelectedMaterialId(item.id)}
+                          className={`w-full text-left p-2.5 rounded-xl border transition cursor-pointer flex items-center gap-2.5 ${
+                            isSelected
+                              ? 'bg-sky-500/15 border-sky-400/50 shadow-[0_0_20px_rgba(56,189,248,0.12)]'
+                              : 'bg-slate-900/70 hover:bg-slate-900 border-white/[0.07] hover:border-white/20'
+                          }`}
+                        >
+                          <span className="text-[10px] font-mono font-bold text-slate-500 shrink-0">
+                            #{itemNumber}
+                          </span>
+                          <span
+                            className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[10px] font-extrabold text-slate-950"
+                            style={{
+                              backgroundColor: meta.badgeColor,
+                              borderColor: meta.badgeColor,
+                            }}
+                          >
+                            <span>{meta.shortLabel}</span>
+                          </span>
+
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-extrabold text-white truncate">
+                              {item.material.title}
+                            </p>
+                          </div>
+
                           <span className="text-[10px] text-slate-500 shrink-0">
                             {item.timestamp}
                           </span>
-                        </div>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-[10px] font-bold text-sky-300/90">
-                            #{item.channelSlug}
-                          </span>
-                          <span className="text-[10px] text-slate-500">·</span>
-                          <p className="text-[10px] text-slate-400 truncate">
-                            {item.material.pedagogicalReason}
-                          </p>
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Section 2: Active Selected Learning Material Interactive Viewer */}
-          {activeCollectedMaterial && (
-            <div className="pt-2 border-t border-white/[0.08] space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-sky-300">
-                    선택된 학습 자료 상세 보기
-                  </span>
-                  <h3 className="text-xs font-black text-white truncate">
-                    {activeCollectedMaterial.material.title}
-                  </h3>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-                {activeCollectedMaterial.channelId !== activeChannel.id && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setActiveChannelId(activeCollectedMaterial.channelId)
-                    }
-                    className="shrink-0 px-2.5 py-1 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] border border-white/15 text-[10px] font-bold text-sky-300 cursor-pointer transition"
-                  >
-                    #{activeCollectedMaterial.channelSlug} 코스로 이동
-                  </button>
-                )}
-              </div>
+              )}
 
-              <LearningMaterialPreviewCard
-                key={`hub-viewer-${activeCollectedMaterial.id}`}
-                material={activeCollectedMaterial.material}
-                mentorId={activeMentor.id}
-                mentorName={activeMentor.name}
-                roleTitle={activeMentor.roleTitle}
-                subject={activeMentor.subject}
-                accentColor={activeMentor.accentColor}
-                assessedLevel={activeCollectedMaterial.assessedLevel}
-                scene3d={activeCollectedMaterial.scene3d}
-                quiz={activeCollectedMaterial.quiz}
-                onClaimCandyReward={(amount, reason) => {
-                  addCandy(amount);
-                  triggerTemporaryAvatarState('happy', 3800);
-                  showCandyNotification(`+${amount} 🍬 ${reason}`);
-                }}
-                onRequestRegenerateFormat={(type, reqMode) => {
-                  const meta = MATERIAL_TYPE_META[type];
-                  handleSendMessage(
-                    `Create a custom ${meta.label} (${meta.koreanHint}) for #${activeChannel.slug} (${activeChannel.title}) calibrated to my ${LEVEL_BADGE_MAP[assessedLevel].label} level!`,
-                    reqMode
-                  );
-                }}
-              />
-            </div>
-          )}
-
-          {/* Section 3: User-Uploaded Course Study Files */}
-          <div className="pt-3 border-t border-white/[0.08] space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5 text-emerald-400" />
-                <span>
-                  내가 올린 학습 파일 ({uploadedFilesInScope.length})
-                </span>
-              </span>
-              <button
-                type="button"
-                disabled={isLoading}
-                onClick={() => fileInputRef.current?.click()}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-sky-500/15 hover:bg-sky-500/25 border border-sky-400/30 text-[10px] font-bold text-sky-200 cursor-pointer transition"
-              >
-                <Paperclip className="w-3 h-3 text-sky-400" />
-                <span>+ 파일 올리기</span>
-              </button>
-            </div>
-
-            {uploadedFilesInScope.length === 0 ? (
-              <div className="p-3 rounded-xl bg-slate-900/40 border border-white/[0.06] text-[11px] text-slate-400 leading-relaxed">
-                하단 채팅창의 <strong className="text-sky-300">파일 첨부</strong>{' '}
-                버튼으로 코드, 노트, 문서 파일을 올리면 이곳에 자동으로 모아지며
-                멘토가 내용을 분석해 답변합니다.
-                <div className="mt-1.5 text-[10px] text-slate-500">
-                  * 음성(🎤), 이미지(🖼️), 영상(🎬) 업로드는 다음 순위로 지원될
-                  예정입니다.
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-1.5">
-                {uploadedFilesInScope.map((fileItem) => (
-                  <div
-                    key={fileItem.attachment.id}
-                    className="p-2.5 rounded-xl bg-slate-900/75 border border-white/[0.08] space-y-1.5"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <FileText className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                        <span className="text-xs font-bold text-white truncate">
-                          {fileItem.attachment.name}
+              {/* Active Selected Material & Quiz Viewer */}
+              {activeCollectedMaterial && (
+                <div className="pt-2 border-t border-white/[0.08] space-y-3">
+                  {/* If 3D Preview is selected, also show the interactive Three.js 3D Viewport */}
+                  {activeCollectedMaterial.material.type === '3d_preview' &&
+                    activeCollectedMaterial.scene3d && (
+                      <div className="space-y-1.5">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-sky-300 flex items-center gap-1.5">
+                          <Box className="w-3.5 h-3.5 text-sky-400" />
+                          <span>Interactive 3D Spatial Viewport</span>
                         </span>
+                        <div className="h-[260px] rounded-2xl overflow-hidden border border-white/10">
+                          <Argon3DViewer
+                            scene={activeCollectedMaterial.scene3d}
+                            accentColor={activeMentor.accentColor}
+                            isGenerating={isLoading}
+                            onRequestGenerate3D={(topic) =>
+                              handleSendMessage(
+                                `Build an interactive 3D Preview of "${topic}" for #${activeChannel.slug}!`,
+                                'generate_3d'
+                              )
+                            }
+                          />
+                        </div>
                       </div>
-                      <span className="text-[10px] font-mono text-slate-400 shrink-0">
-                        {formatFileSize(fileItem.attachment.sizeBytes)}
-                      </span>
-                    </div>
-
-                    {fileItem.attachment.textContent && (
-                      <pre className="text-[10px] text-slate-300 bg-slate-950/80 border border-white/[0.06] rounded-lg p-2 max-h-24 overflow-y-auto whitespace-pre-wrap font-mono">
-                        {fileItem.attachment.textContent.slice(0, 360)}
-                        {fileItem.attachment.textContent.length > 360 ? '...' : ''}
-                      </pre>
                     )}
 
-                    <div className="flex items-center justify-between gap-2 pt-0.5">
-                      <span className="text-[10px] text-slate-500">
-                        #{fileItem.channelSlug} · {fileItem.timestamp}
+                  {/* If Small Test / Quiz is selected, prominently render the QuizDrawer */}
+                  {activeCollectedMaterial.material.type === 'small_test' &&
+                    activeCollectedMaterial.quiz && (
+                      <div className="space-y-1.5">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+                          <ClipboardCheck className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Interactive Quiz Challenge</span>
+                        </span>
+                        <QuizDrawer
+                          quiz={activeCollectedMaterial.quiz}
+                          accentColor={activeMentor.accentColor}
+                          isLoadingQuiz={isLoading}
+                          onAnswerSubmit={(isCorrect, candyEarned) =>
+                            handleQuizComplete(isCorrect, candyEarned)
+                          }
+                          onRequestNewQuiz={() =>
+                            handleSendMessage(
+                              `Make a new interactive Small Test & Quiz for #${activeChannel.slug} (${activeChannel.title})!`,
+                              'generate_small_test'
+                            )
+                          }
+                        />
+                      </div>
+                    )}
+
+                  {/* Interactive JS/HTML Preview Card (Mini Game, Visual Guide, 3D Lab, or Small Test) */}
+                  <LearningMaterialPreviewCard
+                    key={`hub-viewer-${activeCollectedMaterial.id}`}
+                    material={activeCollectedMaterial.material}
+                    mentorId={activeMentor.id}
+                    mentorName={activeMentor.name}
+                    roleTitle={activeMentor.roleTitle}
+                    subject={activeMentor.subject}
+                    accentColor={activeMentor.accentColor}
+                    assessedLevel={activeCollectedMaterial.assessedLevel}
+                    scene3d={activeCollectedMaterial.scene3d}
+                    quiz={activeCollectedMaterial.quiz}
+                    onClaimCandyReward={(amount, reason) => {
+                      addCandy(amount);
+                      triggerTemporaryAvatarState('happy', 3800);
+                      showCandyNotification(`+${amount} 🍬 ${reason}`);
+                    }}
+                    onRequestRegenerateFormat={(type, reqMode) => {
+                      const meta = MATERIAL_TYPE_META[type];
+                      handleSendMessage(
+                        `Create a custom ${meta.label} for #${activeChannel.slug} (${activeChannel.title}) calibrated to my ${LEVEL_BADGE_MAP[assessedLevel].label} level!`,
+                        reqMode
+                      );
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Uploaded Study Files Section (only shown when files have been uploaded) */}
+              {uploadedFilesInScope.length > 0 && (
+                <div className="pt-3 border-t border-white/[0.08] space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>
+                        Uploaded Files ({uploadedFilesInScope.length})
                       </span>
-                      <button
-                        type="button"
-                        disabled={isLoading}
-                        onClick={() =>
-                          handleSendMessage(
-                            `업로드한 파일 "${fileItem.attachment.name}"의 핵심 개념을 #${activeChannel.slug} 코스와 연결해서 요약하고 퀴즈나 미니게임으로 만들어줘!`,
-                            selectedMaterialMode
-                          )
-                        }
-                        className="px-2 py-0.5 rounded-md bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-400/30 text-[10px] font-bold text-emerald-200 cursor-pointer transition"
-                      >
-                        이 파일로 학습 자료 생성
-                      </button>
-                    </div>
+                    </span>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+
+                  <div className="space-y-1.5">
+                    {uploadedFilesInScope.map((fileItem) => (
+                      <div
+                        key={fileItem.attachment.id}
+                        className="p-2.5 rounded-xl bg-slate-900/75 border border-white/[0.08] space-y-1.5"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <FileText className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                            <span className="text-xs font-bold text-white truncate">
+                              {fileItem.attachment.name}
+                            </span>
+                          </div>
+                          <span className="text-[10px] font-mono text-slate-400 shrink-0">
+                            {formatFileSize(fileItem.attachment.sizeBytes)}
+                          </span>
+                        </div>
+
+                        {fileItem.attachment.textContent && (
+                          <pre className="text-[10px] text-slate-300 bg-slate-950/80 border border-white/[0.06] rounded-lg p-2 max-h-24 overflow-y-auto whitespace-pre-wrap font-mono">
+                            {fileItem.attachment.textContent.slice(0, 360)}
+                            {fileItem.attachment.textContent.length > 360
+                              ? '...'
+                              : ''}
+                          </pre>
+                        )}
+
+                        <div className="flex items-center justify-between gap-2 pt-0.5">
+                          <span className="text-[10px] text-slate-500">
+                            #{fileItem.channelSlug} · {fileItem.timestamp}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={isLoading}
+                            onClick={() =>
+                              handleSendMessage(
+                                `Analyze my uploaded file "${fileItem.attachment.name}" in the context of #${activeChannel.slug} and generate an interactive quiz or mini game!`,
+                                selectedMaterialMode
+                              )
+                            }
+                            className="px-2 py-0.5 rounded-md bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-400/30 text-[10px] font-bold text-emerald-200 cursor-pointer transition"
+                          >
+                            Generate Material
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </aside>
     </div>

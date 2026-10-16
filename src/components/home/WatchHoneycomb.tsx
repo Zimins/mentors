@@ -571,6 +571,7 @@ export function WatchHoneycomb() {
   const [isEnrolling, setIsEnrolling] = useState(false);
   const [isMeetModalOpen, setIsMeetModalOpen] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const [viewportWidth, setViewportWidth] = useState(1200);
 
   // Mentos Candy Flip-In state: starts false (showing pure colorful Mentos candy discs)
   // then flips 180deg in a radial wave to reveal the mentors!
@@ -612,7 +613,9 @@ export function WatchHoneycomb() {
   // Detect mobile vs desktop viewport and trigger the Mentos candy flip animation on entry
   useEffect(() => {
     const updateViewport = () => {
-      setIsMobileViewport(window.innerWidth < 768);
+      const w = window.innerWidth;
+      setViewportWidth(w);
+      setIsMobileViewport(w < 768);
     };
     updateViewport();
     window.addEventListener('resize', updateViewport);
@@ -632,7 +635,7 @@ export function WatchHoneycomb() {
   const desktopHoneycombCells: HoneycombCell[] = useMemo(() => {
     const pool = HONEYCOMB_CATALOG;
     const hexSpacingX = 172;
-    const hexSpacingY = 148;
+    const hexSpacingY = 152;
     const rawPoints: Array<{ x: number; y: number; dist: number }> = [];
 
     for (let row = -3; row <= 3; row++) {
@@ -675,24 +678,35 @@ export function WatchHoneycomb() {
     });
   }, []);
 
-  // Mobile Apple Watch Honeycomb Lattice: rich, prominent mentor cluster framing the mobile hero
+  // Mobile Apple Watch Honeycomb Lattice: spacious full-width spread with generous row & column breathing room
   const mobileHoneycombCells: HoneycombCell[] = useMemo(() => {
     const pool = HONEYCOMB_CATALOG;
-    const hexSpacingX = 94;
-    const hexSpacingY = 82;
+    const isCompactPhone = viewportWidth < 460;
+    const hexSpacingX = isCompactPhone ? 124 : 142;
+    const hexSpacingY = isCompactPhone ? 116 : 124;
+    const maxAbsX = Math.max(210, viewportWidth / 2 + 24);
     const rawPoints: Array<{ x: number; y: number; dist: number }> = [];
 
     for (let row = -3; row <= 3; row++) {
-      if (Math.abs(row) <= 1) continue;
       const isOddRow = Math.abs(row) % 2 === 1;
-      const minCol = isOddRow ? -2 : -2;
-      const maxCol = isOddRow ? 1 : 2;
 
-      for (let col = minCol; col <= maxCol; col++) {
+      for (let col = -4; col <= 4; col++) {
         const x = col * hexSpacingX + (isOddRow ? hexSpacingX * 0.5 : 0);
-        // Keep within mobile screen width while framing the hero copy cleanly
-        if (Math.abs(x) > 165) continue;
-        const y = row * hexSpacingY + (row > 0 ? 34 : -34);
+        if (Math.abs(x) > maxAbsX) continue;
+
+        let y: number;
+        if (Math.abs(row) <= 1) {
+          y = row * hexSpacingY;
+          // Keep the center hero copy & buttons clear while allowing side mentors on wider mobile viewports
+          const normX = x / 255;
+          const normY = y / 175;
+          if (normX * normX + normY * normY < 1.0) continue;
+        } else {
+          const baseRowY =
+            (Math.abs(row) - 2) * hexSpacingY + (isCompactPhone ? 180 : 188);
+          y = row > 0 ? baseRowY : -baseRowY;
+        }
+
         const dist = Math.hypot(x, y);
         rawPoints.push({ x, y, dist });
       }
@@ -704,7 +718,7 @@ export function WatchHoneycomb() {
       const template = pool[idx % pool.length];
       const discBackground =
         WATCH_DISC_PALETTES[idx % WATCH_DISC_PALETTES.length];
-      const ringScale = Math.abs(pt.y) > 225 ? 0.9 : 1.02;
+      const ringScale = Math.abs(pt.y) > 250 ? 0.94 : 1.02;
 
       return {
         id: `mcell-${idx}-${template.baseMentorId}`,
@@ -716,7 +730,7 @@ export function WatchHoneycomb() {
         ringScale,
       };
     });
-  }, []);
+  }, [viewportWidth]);
 
   const activeCells = isMobileViewport
     ? mobileHoneycombCells
@@ -726,10 +740,12 @@ export function WatchHoneycomb() {
   useEffect(() => {
     if (!isMentosFlipped || activeCells.length === 0) return;
 
+    const mobileMaxSpotlightX = Math.max(145, viewportWidth / 2 - 44);
     // Pick candidates that are well inside the viewport so the highlighted mentor + label never clip
     const spotlightCandidates = activeCells.filter((cell) =>
       isMobileViewport
-        ? Math.abs(cell.baseX) <= 125 && Math.abs(cell.baseY) <= 235
+        ? Math.abs(cell.baseX) <= mobileMaxSpotlightX &&
+          Math.abs(cell.baseY) <= 310
         : Math.abs(cell.baseX) <= 460 && Math.abs(cell.baseY) <= 280
     );
     const pool =
@@ -752,7 +768,7 @@ export function WatchHoneycomb() {
     }, 2400);
 
     return () => clearInterval(interval);
-  }, [isMentosFlipped, activeCells, isMobileViewport]);
+  }, [isMentosFlipped, activeCells, isMobileViewport, viewportWidth]);
 
   const handleStagePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.pointerType === 'touch') return;
@@ -824,9 +840,11 @@ export function WatchHoneycomb() {
   };
 
   const handlePickMentorAround = () => {
+    const mobileMaxSpotlightX = Math.max(145, viewportWidth / 2 - 44);
     const candidates = activeCells.filter((cell) =>
       isMobileViewport
-        ? Math.abs(cell.baseX) <= 125 && Math.abs(cell.baseY) <= 235
+        ? Math.abs(cell.baseX) <= mobileMaxSpotlightX &&
+          Math.abs(cell.baseY) <= 310
         : Math.abs(cell.baseX) <= 460 && Math.abs(cell.baseY) <= 280
     );
     const pool = candidates.length > 0 ? candidates : activeCells;
@@ -903,7 +921,7 @@ export function WatchHoneycomb() {
             setIsDragging(false);
             setPointerPos(null);
           }}
-          className="relative h-[calc(100dvh-3.5rem)] min-h-[620px] w-full overflow-hidden bg-black flex flex-col items-center justify-center select-none touch-pan-y"
+          className="relative h-[calc(100dvh-3.5rem)] min-h-[700px] sm:min-h-[740px] w-full overflow-hidden bg-black flex flex-col items-center justify-center select-none touch-pan-y"
         >
           {/* HONEYCOMB BUBBLE CLUSTER WITH 3D MENTOS CANDY FLIP REVEAL */}
           <div className="pointer-events-none absolute inset-0">
@@ -984,7 +1002,7 @@ export function WatchHoneycomb() {
                     style={{ perspective: '900px' }}
                     className="group relative flex items-center justify-center rounded-full focus:outline-none cursor-pointer active:scale-95 transition-transform"
                   >
-                    {/* 3D Flip Container: Front = Mentos Candy Disc, Back = Mentor Face */}
+                    {/* 3D Flip Container: starts at 180deg (Mentos Candy Disc) and flips to 0deg (Mentor Face) so Rive canvas rests flat at 0deg */}
                     <div
                       style={{
                         width: avatarSize,
@@ -992,18 +1010,19 @@ export function WatchHoneycomb() {
                         transformStyle: 'preserve-3d',
                         transition: `transform 520ms cubic-bezier(0.22, 1, 0.36, 1) ${flipDelayMs}ms, box-shadow 350ms ease`,
                         transform: isMentosFlipped
-                          ? 'rotateY(180deg)'
-                          : 'rotateY(0deg)',
+                          ? 'rotateY(0deg)'
+                          : 'rotateY(180deg)',
                         boxShadow: isHighlighted
                           ? `0 0 0 3px #ffffff, 0 0 28px ${cell.accentColor}cc, 0 14px 36px rgba(0,0,0,0.85)`
                           : `0 0 0 2px ${cell.accentColor}77, 0 8px 22px rgba(0,0,0,0.75)`,
                       }}
                       className="relative rounded-full"
                     >
-                      {/* FRONT FACE (0deg): Tactile Glossy Mentos Candy Disc */}
+                      {/* INITIAL FACE (180deg): Tactile Glossy Mentos Candy Disc shown before flip */}
                       <div
                         style={{
                           background: cell.discBackground,
+                          transform: 'rotateY(180deg)',
                           backfaceVisibility: 'hidden',
                           WebkitBackfaceVisibility: 'hidden',
                         }}
@@ -1021,10 +1040,10 @@ export function WatchHoneycomb() {
                         />
                       </div>
 
-                      {/* BACK FACE (180deg): Expressive Mentor Face revealed after flip */}
+                      {/* RESTING FACE (0deg): Expressive Mentor Face revealed after flip */}
                       <div
                         style={{
-                          transform: 'rotateY(180deg)',
+                          transform: 'rotateY(0deg)',
                           backfaceVisibility: 'hidden',
                           WebkitBackfaceVisibility: 'hidden',
                         }}

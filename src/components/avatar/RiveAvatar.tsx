@@ -83,7 +83,7 @@ export function fetchRivBuffer(url: string): Promise<ArrayBuffer | null> {
     return existing;
   }
 
-  const promise = fetch(url, { cache: 'force-cache' })
+  const promise = fetch(url)
     .then(async (res) => {
       const contentType = res.headers.get('content-type') || '';
       if (!res.ok || contentType.includes('text/html')) {
@@ -169,7 +169,7 @@ function RiveCanvasRuntime({
       },
     },
     {
-      shouldUseIntersectionObserver: true,
+      shouldUseIntersectionObserver: false,
       useDevicePixelRatio: true,
       customDevicePixelRatio: customDpr,
     }
@@ -177,6 +177,13 @@ function RiveCanvasRuntime({
 
   useEffect(() => {
     if (!rive) return;
+
+    try {
+      rive.resizeToCanvas();
+      rive.startRendering();
+    } catch {
+      // Ignore if canvas not ready yet
+    }
 
     let resetTimer: ReturnType<typeof setTimeout> | null = null;
     let repeatInterval: ReturnType<typeof setInterval> | null = null;
