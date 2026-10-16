@@ -9,12 +9,30 @@ export interface LearnerSummary {
   streakDays: number;
   xpTotal: number;
   mentorLevels: Record<string, StudentLevel>;
+  activeMentorId?: string;
+  engagedMentorIds?: string[];
   quizStats: {
     totalAttempted: number;
     correctCount: number;
     accuracyRate: number; // e.g. 75 (%)
   };
 }
+
+export interface EngagedMentorStats {
+  id: string;
+  name: string;
+  roleTitle: string;
+  subject: string;
+  shortTag: string;
+  accentColor: string;
+  secondaryColor: string;
+  studentLevel: StudentLevel;
+  submissionCount: number;
+  correctCount: number;
+  accuracyRate: number | null;
+  logCount: number;
+}
+
 
 export interface AgentDiagnosticReport {
   userId: string;

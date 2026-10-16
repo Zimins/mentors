@@ -136,10 +136,5 @@ export default async function MentorPage({ params, searchParams }: MentorPagePro
         },
       };
 
-  return (
-    <MentorStudioView
-      mentor={mentor}
-      standaloneTestMode={query.test === "true"}
-    />
-  );
+  return <MentorStudioView mentor={mentor} />;
 }

@@ -84,6 +84,7 @@ export async function POST(req: NextRequest) {
       currentLevel = "unassessed",
       history = [],
       mode = "chat",
+      attachments = [],
     } = body || {};
 
     // 1. Fetch expert prompt tuning & custom directives from adminStore
@@ -105,6 +106,20 @@ export async function POST(req: NextRequest) {
       effectivePersona += `\n[EXPERT GROUNDING KNOWLEDGE BASE]:\n${refSnippet}`;
     }
 
+    // 2b. Ground with user-uploaded file attachments if provided
+    let augmentedUserMessage = String(userMessage);
+    if (Array.isArray(attachments) && attachments.length > 0) {
+      const fileContext = attachments
+        .map(
+          (att: { name?: string; mimeType?: string; sizeBytes?: number; textContent?: string }) =>
+            `[Attached File: ${att.name || "document"} (${att.mimeType || "file"}, ${att.sizeBytes || 0} bytes)]\n${
+              att.textContent ? att.textContent.slice(0, 4000) : "(Binary/structured file attached by student)"
+            }`
+        )
+        .join("\n\n");
+      augmentedUserMessage = `${augmentedUserMessage}\n\n--- USER UPLOADED FILES ---\n${fileContext}`;
+    }
+
     // 3. Execute turn via Gemini 4 Argon
     const validatedMode: MentorRequestMode = VALID_MODES.includes(
       mode as MentorRequestMode
@@ -118,7 +133,7 @@ export async function POST(req: NextRequest) {
       roleTitle: String(roleTitle),
       subject: String(subject),
       systemPersona: effectivePersona,
-      userMessage: String(userMessage),
+      userMessage: augmentedUserMessage,
       currentLevel: (["unassessed", "beginner", "intermediate", "advanced"].includes(
         currentLevel
       )

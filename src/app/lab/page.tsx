@@ -17,14 +17,6 @@ import type {
 
 type TrackTab = "A" | "B" | "C" | "D";
 
-const RIVE_STATES: RiveAvatarState[] = [
-  "idle",
-  "happy",
-  "sad",
-  "thinking",
-  "talking",
-];
-
 const SAMPLE_QUIZ: QuizQuestion = {
   id: "lab-quiz-1",
   topic: "Binary Search Tree & CPU Cache",
@@ -306,8 +298,6 @@ export default function TrackTestLabPage() {
                   customRivFiles[currentMentor.id] ||
                   customRivFiles.global
                 }
-                interactive
-                onStateClick={(next) => setAvatarState(next)}
               />
               <div className="mt-4 text-center">
                 <div className="text-base font-bold text-white">
@@ -316,33 +306,11 @@ export default function TrackTestLabPage() {
                 <div className="mt-1 text-xs text-slate-400">
                   Target .riv:{" "}
                   <code>{customRivFileName || currentMentor.rivFile}</code> •
-                  Current State:{" "}
+                  Auto State:{" "}
                   <span className="font-semibold text-sky-400">
                     {avatarState.toUpperCase()}
                   </span>
                 </div>
-              </div>
-            </div>
-
-            {/* 5-State Trigger Bar */}
-            <div className="space-y-2">
-              <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                Trigger 5 Explicit States (State Machine / Timeline)
-              </label>
-              <div className="grid grid-cols-5 gap-2">
-                {RIVE_STATES.map((st) => (
-                  <button
-                    key={st}
-                    onClick={() => setAvatarState(st)}
-                    className={`rounded-xl border px-3 py-2.5 text-xs font-bold capitalize transition ${
-                      avatarState === st
-                        ? "border-sky-400 bg-sky-500/20 text-sky-200 shadow-md shadow-sky-500/10"
-                        : "border-slate-800 bg-slate-950 text-slate-400 hover:border-slate-700 hover:text-white"
-                    }`}
-                  >
-                    {st}
-                  </button>
-                ))}
               </div>
             </div>
 

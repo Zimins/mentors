@@ -15,8 +15,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const submissions = adminStore.getSubmissions(userId);
-    const sessionLogs = adminStore.getSessionLogs(userId);
+    const submissions = adminStore.getSubmissions(userId, mentorId);
+    const sessionLogs = adminStore.getSessionLogs(userId, mentorId);
+    const effectiveSubmissions =
+      submissions.length > 0 ? submissions : adminStore.getSubmissions(userId);
+    const effectiveLogs =
+      sessionLogs.length > 0 ? sessionLogs : adminStore.getSessionLogs(userId);
+
     const promptConfig = adminStore.getPromptConfig(mentorId);
     const customDirective = promptConfig?.studentDirectives?.[userId];
 
@@ -24,8 +29,8 @@ export async function POST(req: NextRequest) {
       userId,
       mentorId,
       learner,
-      submissions,
-      sessionLogs,
+      submissions: effectiveSubmissions,
+      sessionLogs: effectiveLogs,
       customDirective,
     });
 

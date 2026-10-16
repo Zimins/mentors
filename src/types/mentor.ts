@@ -98,11 +98,25 @@ export interface MentorAgentTurnResponse {
   modelUsed?: string;
 }
 
+export type AttachmentKind = 'file' | 'image' | 'audio' | 'video';
+
+export interface ChatAttachment {
+  id: string;
+  name: string;
+  mimeType: string;
+  sizeBytes: number;
+  kind: AttachmentKind;
+  /** Extracted text / source code content for file analysis */
+  textContent?: string;
+  previewUrl?: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'mentor';
   text: string;
   timestamp: string;
+  attachments?: ChatAttachment[];
   avatarState?: RiveAvatarState;
   assessedLevel?: StudentLevel;
   recommendedMaterialType?: LearningMaterialType;
@@ -127,7 +141,7 @@ export interface MentorConfig {
   secondaryColor: string;
   rivFile: string;
   stateMachineName?: string;
-  ring: 0 | 1; // 0 = center of Apple Watch honeycomb, 1 = surrounding ring
+  ring?: 0 | 1; // 0 = center of Apple Watch honeycomb, 1 = surrounding ring
   systemPersona: string;
   starterPrompts: string[];
   defaultScene3d: Scene3DSpec;

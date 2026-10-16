@@ -22,19 +22,29 @@ const learnersStore = new Map<string, LearnerSummary>([
       userId: 'demo-scholar-01',
       displayName: 'Hackathon Scholar (You)',
       lastActiveAt: new Date(Date.now() - 1000 * 60 * 8).toISOString(),
-      totalTurns: 14,
-      candyBalance: 120,
+      totalTurns: 18,
+      candyBalance: 165,
       streakDays: 5,
-      xpTotal: 340,
+      xpTotal: 420,
+      activeMentorId: 'cs-professor',
+      engagedMentorIds: [
+        'cs-professor',
+        'basic-spanish',
+        'vibe-coding',
+        'dating-coach',
+        'korea-history',
+      ],
       mentorLevels: {
         'cs-professor': 'intermediate',
-        'algo-coach': 'beginner',
-        'arch-sensei': 'intermediate',
+        'basic-spanish': 'beginner',
+        'vibe-coding': 'intermediate',
+        'dating-coach': 'beginner',
+        'korea-history': 'intermediate',
       },
       quizStats: {
-        totalAttempted: 8,
-        correctCount: 6,
-        accuracyRate: 75,
+        totalAttempted: 11,
+        correctCount: 9,
+        accuracyRate: 81.8,
       },
     },
   ],
@@ -48,9 +58,12 @@ const learnersStore = new Map<string, LearnerSummary>([
       candyBalance: 240,
       streakDays: 12,
       xpTotal: 580,
+      activeMentorId: 'vibe-coding',
+      engagedMentorIds: ['cs-professor', 'vibe-coding', 'basic-spanish'],
       mentorLevels: {
         'cs-professor': 'advanced',
-        'algo-coach': 'intermediate',
+        'vibe-coding': 'intermediate',
+        'basic-spanish': 'beginner',
       },
       quizStats: {
         totalAttempted: 12,
@@ -63,14 +76,17 @@ const learnersStore = new Map<string, LearnerSummary>([
     'sarah-cloud-intern',
     {
       userId: 'sarah-cloud-intern',
-      displayName: 'Sarah Lee (Cloud Intern)',
+      displayName: 'Sarah Lee (Learner)',
       lastActiveAt: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
       totalTurns: 9,
       candyBalance: 40,
       streakDays: 2,
       xpTotal: 190,
+      activeMentorId: 'korea-history',
+      engagedMentorIds: ['korea-history', 'dating-coach', 'cs-professor'],
       mentorLevels: {
-        'arch-sensei': 'beginner',
+        'korea-history': 'beginner',
+        'dating-coach': 'beginner',
         'cs-professor': 'beginner',
       },
       quizStats: {
@@ -83,6 +99,7 @@ const learnersStore = new Map<string, LearnerSummary>([
 ]);
 
 const submissionsStore: QuizSubmissionRecord[] = [
+  // Prof. Jun (CS Professor) Submissions
   {
     id: 'sub-001',
     userId: 'demo-scholar-01',
@@ -140,6 +157,66 @@ const submissionsStore: QuizSubmissionRecord[] = [
     submittedAt: new Date(Date.now() - 1000 * 60 * 35).toISOString(),
     explanation: 'Dereferencing a freed pointer leads to Undefined Behavior (UB), which can silently corrupt adjacent data or crash with SIGSEGV.',
   },
+  // Mina (Algorithm Coach) Submissions
+  {
+    id: 'sub-005',
+    userId: 'demo-scholar-01',
+    mentorId: 'algo-coach',
+    channelSlug: 'dijkstra-shortest-paths',
+    questionText: 'In Dijkstra algorithm with a min-priority queue, why can negative edge weights produce incorrect shortest paths?',
+    options: [
+      'Min-heap only works on even integer numbers',
+      'Once a vertex distance is finalized and popped, Dijkstra assumes its optimal distance will never decrease again',
+      'Negative edges cause an immediate stack overflow in graph traversal',
+      'Dijkstra requires directed acyclic graphs (DAGs) only',
+    ],
+    selectedOptionIndex: 1,
+    correctOptionIndex: 1,
+    isCorrect: true,
+    candyReward: 20,
+    submittedAt: new Date(Date.now() - 1000 * 60 * 55).toISOString(),
+    explanation: 'Dijkstra greedy invariant assumes visited vertices have reached global optimum. Negative weights violate this monotonic relaxation.',
+  },
+  {
+    id: 'sub-006',
+    userId: 'demo-scholar-01',
+    mentorId: 'algo-coach',
+    channelSlug: 'bfs-vs-dfs',
+    questionText: 'Which graph search algorithm is guaranteed to find the shortest path in an unweighted graph?',
+    options: [
+      'Depth First Search (DFS)',
+      'Breadth First Search (BFS)',
+      'Topological Sort',
+      'Post-order Traversal',
+    ],
+    selectedOptionIndex: 1,
+    correctOptionIndex: 1,
+    isCorrect: true,
+    candyReward: 15,
+    submittedAt: new Date(Date.now() - 1000 * 60 * 70).toISOString(),
+    explanation: 'BFS explores vertices in concentric level rings (distance 0, 1, 2...), guaranteeing first arrival at target is minimal hop count.',
+  },
+  // Coach Pen (Cloud & Systems) Submissions
+  {
+    id: 'sub-007',
+    userId: 'demo-scholar-01',
+    mentorId: 'arch-sensei',
+    channelSlug: 'cloud-run-mesh',
+    questionText: 'When Cloud Run auto-scales from zero to 100 instances during a traffic burst, how can we prevent overloading downstream Firestore databases?',
+    options: [
+      'Disable HTTPS load balancing during peak times',
+      'Implement Cloud Tasks queue throttling and connection pool clamping on container instances',
+      'Convert all NoSQL documents into CSV files on local disk',
+      'Increase client timeout to 30 minutes',
+    ],
+    selectedOptionIndex: 1,
+    correctOptionIndex: 1,
+    isCorrect: true,
+    candyReward: 20,
+    submittedAt: new Date(Date.now() - 1000 * 60 * 95).toISOString(),
+    explanation: 'Rate-limiting ingress via Cloud Tasks queues or Redis mutex locks buffers spiky traffic without exhausting DB connection pools.',
+  },
+  // Sarah Lee Submissions
   {
     id: 'sub-004',
     userId: 'sarah-cloud-intern',
@@ -162,6 +239,7 @@ const submissionsStore: QuizSubmissionRecord[] = [
 ];
 
 const sessionLogsStore: LearnerSessionLog[] = [
+  // Prof. Jun (CS Professor) Session Logs
   {
     id: 'log-001',
     userId: 'demo-scholar-01',
@@ -199,6 +277,57 @@ const sessionLogsStore: LearnerSessionLog[] = [
     text: 'Show me an interview-level question on 64-byte L1 cache line prefetching!',
     studentIntent: 'propose_topic',
     timestamp: new Date(Date.now() - 1000 * 60 * 26).toISOString(),
+  },
+  // Mina (Algorithm Coach) Session Logs
+  {
+    id: 'log-006',
+    userId: 'demo-scholar-01',
+    mentorId: 'algo-coach',
+    role: 'user',
+    text: 'Can you demonstrate how Dijkstra algorithm relaxes edges using a 3D animated packet trace?',
+    studentIntent: 'request_3d',
+    scene3dTitle: 'Dijkstra Shortest Path & Priority Queue Frontier',
+    timestamp: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
+  },
+  {
+    id: 'log-007',
+    userId: 'demo-scholar-01',
+    mentorId: 'algo-coach',
+    role: 'mentor',
+    text: 'Here is the 3D graph frontier! Glowing emerald vertices represent visited nodes, while yellow packets relax the next closest edge (S -> A -> C -> T) with minimal cumulative cost d=7.',
+    studentIntent: 'general',
+    scene3dTitle: 'Dijkstra Shortest Path & Priority Queue Frontier',
+    timestamp: new Date(Date.now() - 1000 * 60 * 59).toISOString(),
+  },
+  {
+    id: 'log-008',
+    userId: 'demo-scholar-01',
+    mentorId: 'algo-coach',
+    role: 'user',
+    text: 'I want to master A* heuristic search compared to vanilla Dijkstra. Can you quiz me?',
+    studentIntent: 'challenge_quiz',
+    timestamp: new Date(Date.now() - 1000 * 60 * 56).toISOString(),
+  },
+  // Coach Pen (Cloud & Systems) Session Logs
+  {
+    id: 'log-009',
+    userId: 'demo-scholar-01',
+    mentorId: 'arch-sensei',
+    role: 'user',
+    text: 'How does Google Anycast Global Load Balancing route packets across multi-region Cloud Run pods in 3D?',
+    studentIntent: 'request_3d',
+    scene3dTitle: 'GCP Cloud Run + Firestore + Global Load Balancer Mesh',
+    timestamp: new Date(Date.now() - 1000 * 60 * 100).toISOString(),
+  },
+  {
+    id: 'log-010',
+    userId: 'demo-scholar-01',
+    mentorId: 'arch-sensei',
+    role: 'mentor',
+    text: 'Take a look at the 3D mesh: The top cylinder is our Anycast L7 VIP. Incoming HTTP/3 requests are fanned out directly to regional Cloud Run instances with zero cross-region hops!',
+    studentIntent: 'general',
+    scene3dTitle: 'GCP Cloud Run + Firestore + Global Load Balancer Mesh',
+    timestamp: new Date(Date.now() - 1000 * 60 * 98).toISOString(),
   },
   {
     id: 'log-005',
@@ -273,8 +402,60 @@ Guide students to visualize the cache hierarchy in 3D: L1 Data Cache (fastest, s
   },
 ];
 
-// Diagnostic summaries generated by Gemini
+// Diagnostic summaries generated by Gemini (keyed by userId and userId:mentorId)
 const diagnosticReportsStore = new Map<string, AgentDiagnosticReport>([
+  [
+    'demo-scholar-01:cs-professor',
+    {
+      userId: 'demo-scholar-01',
+      mentorId: 'cs-professor',
+      generatedAt: new Date(Date.now() - 1000 * 60 * 10).toISOString(),
+      masterySummary:
+        'The student demonstrates a solid intermediate understanding of CPU stack frame unwinding and L1 cache line spatial locality. However, they exhibited a notable misconception regarding dangling pointer dereference safety and heap reclamation lifecycle.',
+      identifiedWeaknesses: [
+        'Heap memory lifecycle: Believed CPU memory controller automatically clones or frees blocks upon pointer dissolution',
+        'Undefined Behavior (UB) implications in low-level systems programming',
+      ],
+      learningHabits:
+        'Highly proactive learner who requests 3D interactive visualizations before attempting quizzes. Responds well to architectural mental models.',
+      recommendedNextSteps: [
+        'Run an interactive 3D simulation specifically demonstrating a Dangling Pointer dereference and segmentation fault boundary',
+        'Assign a multi-step quiz on C++ smart pointers (unique_ptr vs shared_ptr) to reinforce automated ownership',
+      ],
+      suggestedTopics: [
+        'Dangling Pointers & Use-After-Free Vulnerabilities',
+        'RAII (Resource Acquisition Is Initialization)',
+        'Cache Line False Sharing in Multi-core Systems',
+      ],
+      confidenceScore: 88,
+    },
+  ],
+  [
+    'demo-scholar-01:algo-coach',
+    {
+      userId: 'demo-scholar-01',
+      mentorId: 'algo-coach',
+      generatedAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+      masterySummary:
+        'Demonstrates clear fundamental intuition regarding BFS level-ring shortest path guarantees in unweighted graphs, and understands priority queue edge relaxation in Dijkstra. Shows keen interest in comparing A* heuristic estimators.',
+      identifiedWeaknesses: [
+        'Nuance of negative weight cycles and why Bellman-Ford is needed over Dijkstra',
+        'Memory overhead of storing visited node parent pointers during massive graph frontiers',
+      ],
+      learningHabits:
+        'Engages strongly with animated 3D packet traces and challenges themselves with algorithmic edge cases before moving to new topics.',
+      recommendedNextSteps: [
+        'Simulate a directed graph with a negative edge cycle to visualize why Dijkstra enters an incorrect state',
+        'Introduce A* Euclidean vs Manhattan distance heuristic comparison in 3D',
+      ],
+      suggestedTopics: [
+        'A* Heuristic Search & Admissibility',
+        'Bellman-Ford & Negative Cycle Detection',
+        'Topological Sort on Dependency DAGs',
+      ],
+      confidenceScore: 92,
+    },
+  ],
   [
     'demo-scholar-01',
     {
@@ -336,16 +517,18 @@ export const adminStore = {
     learnersStore.set(summary.userId, summary);
   },
 
-  // Submissions
-  getSubmissions(userId?: string): QuizSubmissionRecord[] {
-    if (!userId) return submissionsStore;
-    return submissionsStore.filter((s) => s.userId === userId);
+  // Submissions (Filterable by userId and mentorId)
+  getSubmissions(userId?: string, mentorId?: string): QuizSubmissionRecord[] {
+    let list = submissionsStore;
+    if (userId) list = list.filter((s) => s.userId === userId);
+    if (mentorId) list = list.filter((s) => s.mentorId === mentorId);
+    return list;
   },
 
   recordSubmission(submission: QuizSubmissionRecord): void {
     submissionsStore.unshift(submission);
 
-    // Update learner stats
+    // Update learner stats & active mentor
     const learner = learnersStore.get(submission.userId);
     if (learner) {
       learner.quizStats.totalAttempted += 1;
@@ -357,14 +540,21 @@ export const adminStore = {
         (learner.quizStats.correctCount / learner.quizStats.totalAttempted) * 100
       );
       learner.lastActiveAt = new Date().toISOString();
+      learner.activeMentorId = submission.mentorId;
+      if (!learner.engagedMentorIds) learner.engagedMentorIds = [];
+      if (!learner.engagedMentorIds.includes(submission.mentorId)) {
+        learner.engagedMentorIds.push(submission.mentorId);
+      }
       learnersStore.set(submission.userId, learner);
     }
   },
 
-  // Session Logs
-  getSessionLogs(userId?: string): LearnerSessionLog[] {
-    if (!userId) return sessionLogsStore;
-    return sessionLogsStore.filter((l) => l.userId === userId);
+  // Session Logs (Filterable by userId and mentorId)
+  getSessionLogs(userId?: string, mentorId?: string): LearnerSessionLog[] {
+    let list = sessionLogsStore;
+    if (userId) list = list.filter((l) => l.userId === userId);
+    if (mentorId) list = list.filter((l) => l.mentorId === mentorId);
+    return list;
   },
 
   recordSessionLog(log: LearnerSessionLog): void {
@@ -373,6 +563,11 @@ export const adminStore = {
     if (learner) {
       learner.totalTurns += 1;
       learner.lastActiveAt = new Date().toISOString();
+      learner.activeMentorId = log.mentorId;
+      if (!learner.engagedMentorIds) learner.engagedMentorIds = [];
+      if (!learner.engagedMentorIds.includes(log.mentorId)) {
+        learner.engagedMentorIds.push(log.mentorId);
+      }
       learnersStore.set(log.userId, learner);
     }
   },
@@ -432,18 +627,23 @@ export const adminStore = {
     }
   },
 
-  // AI Diagnostic Reports
-  getDiagnosticReport(userId: string): AgentDiagnosticReport | undefined {
+  // AI Diagnostic Reports (Query by userId and optional mentorId)
+  getDiagnosticReport(userId: string, mentorId?: string): AgentDiagnosticReport | undefined {
+    if (mentorId) {
+      const specific = diagnosticReportsStore.get(`${userId}:${mentorId}`);
+      if (specific) return specific;
+    }
     return diagnosticReportsStore.get(userId);
   },
 
   saveDiagnosticReport(report: AgentDiagnosticReport): void {
+    diagnosticReportsStore.set(`${report.userId}:${report.mentorId}`, report);
     diagnosticReportsStore.set(report.userId, report);
 
     const db = getFirestoreClient();
     if (db) {
       db.collection('mentors_admin_diagnostics')
-        .doc(report.userId)
+        .doc(`${report.userId}_${report.mentorId}`)
         .set(report, { merge: true })
         .catch(() => {
           firestoreUnavailable = true;

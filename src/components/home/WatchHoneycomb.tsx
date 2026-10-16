@@ -58,233 +58,239 @@ const WATCH_DISC_PALETTES = [
 // Helper to preview the curriculum channels a mentor will teach once enrolled
 function getPreviewCurriculumForSubject(subject: string, shortTag: string): string[] {
   const s = `${subject} ${shortTag}`.toLowerCase();
-  if (s.includes('architecture') || s.includes('kernel') || s.includes('cs')) {
+  if (s.includes('spanish') || s.includes('hola') || s.includes('language')) {
     return [
-      '01-pointers-and-stack-heap',
-      '02-cpu-cache-hierarchy',
-      '03-virtual-memory-and-tlb',
-      '04-concurrency-and-locks',
+      '01-hola-greetings-and-phonetics',
+      '02-ser-vs-estar-core-verbs',
+      '03-tapas-cafe-and-travel-talk',
+      '04-sentence-building-in-action',
     ];
   }
-  if (s.includes('data') || s.includes('deep') || s.includes('vision') || s.includes('ml')) {
+  if (s.includes('vibe') || s.includes('prompt') || s.includes('ai-native')) {
     return [
-      '01-gradient-descent-foundations',
-      '02-multi-head-attention',
-      '03-embeddings-and-vector-space',
-      '04-backprop-optimization',
+      '01-product-vibe-and-prompt-spec',
+      '02-rapid-ui-and-fullstack-slice',
+      '03-context-debugging-no-loops',
+      '04-one-click-cloud-shipping',
     ];
   }
-  if (s.includes('quantum') || s.includes('robot') || s.includes('gpu') || s.includes('cuda')) {
+  if (
+    s.includes('girlfriend') ||
+    s.includes('dating') ||
+    s.includes('relationship') ||
+    s.includes('social') ||
+    s.includes('romance')
+  ) {
     return [
-      '01-superposition-and-qubits',
-      '02-quantum-entanglement-gates',
-      '03-kinematics-and-control',
-      '04-parallel-warp-execution',
+      '01-authentic-confidence-and-vibe',
+      '02-natural-openers-zero-awkward',
+      '03-active-listening-and-banter',
+      '04-memorable-first-date-blueprint',
     ];
   }
-  if (s.includes('math') || s.includes('calc') || s.includes('discrete')) {
+  if (s.includes('korea') || s.includes('history') || s.includes('sejong') || s.includes('joseon')) {
     return [
-      '01-eigenvalues-and-linear-maps',
-      '02-fourier-harmonics',
-      '03-combinatorics-graph-proofs',
-      '04-vector-fields-and-pdes',
+      '01-three-kingdoms-and-goryeo',
+      '02-king-sejong-and-hangul-1443',
+      '03-yi-sun-sin-and-turtle-ship',
+      '04-han-river-miracle-and-kwave',
     ];
   }
-  if (s.includes('algo') || s.includes('shader') || s.includes('design')) {
+  if (s.includes('cs') || s.includes('computer science') || s.includes('binary') || s.includes('architecture')) {
     return [
-      '01-shortest-path-and-search',
-      '02-dynamic-programming-patterns',
-      '03-real-time-rendering-math',
-      '04-distributed-cache-architecture',
+      '01-binary-and-logic-gates',
+      '02-variables-stack-and-heap',
+      '03-algorithms-and-big-o',
+      '04-os-and-internet-packets',
     ];
   }
-  if (s.includes('neuro') || s.includes('bio') || s.includes('protein')) {
+  if (s.includes('algo') || s.includes('graph') || s.includes('tree')) {
     return [
-      '01-synaptic-action-potentials',
-      '02-neurotransmitter-signaling',
-      '03-protein-folding-dynamics',
-      '04-hebbian-memory-networks',
+      '01-bst-and-tree-balancing',
+      '02-dijkstra-and-graph-search',
+      '03-dynamic-programming-3d',
+      '04-sliding-window-and-heaps',
     ];
   }
-  if (s.includes('sec') || s.includes('pwn') || s.includes('network')) {
+  if (s.includes('ai') || s.includes('llm') || s.includes('transformer') || s.includes('neural')) {
     return [
-      '01-tls-zero-trust-handshake',
-      '02-stack-frame-defense',
-      '03-packet-routing-topology',
-      '04-memory-safety-audits',
+      '01-token-embeddings-in-3d',
+      '02-multi-head-self-attention',
+      '03-backprop-and-loss-landscapes',
+      '04-rag-and-agent-reasoning',
     ];
   }
   return [
-    '01-distributed-raft-consensus',
-    '02-b-tree-and-lsm-storage',
-    '03-global-mesh-load-balancing',
-    '04-fault-tolerant-replication',
+    '01-black-hole-accretion-disks',
+    '02-exoplanet-transit-photometry',
+    '03-gravitational-lensing-3d',
+    '04-lagrange-points-and-orbits',
   ];
 }
 
-// Mentor catalog cycling the 8 expressive .riv files
+// Mentor catalog cycling the 8 expressive .riv files with the featured demo subjects
 const HONEYCOMB_CATALOG: Array<
   Omit<HoneycombCell, 'id' | 'baseX' | 'baseY' | 'dist' | 'ringScale' | 'discBackground'>
 > = [
   {
     baseMentorId: 'cs-professor',
     name: 'Prof. Jun',
-    roleTitle: 'Systems & Architecture',
-    subject: 'Computer Architecture, Pointers & Memory Hierarchy',
-    shortTag: 'CS & Systems',
+    roleTitle: 'Computer Science 101 Professor',
+    subject: 'CS 101 (Computer Science Fundamentals)',
+    shortTag: 'CS 101',
     rivFile: '/riv/jun.riv',
     accentColor: '#38bdf8',
     secondaryColor: '#0284c7',
   },
   {
-    baseMentorId: 'data-scientist',
+    baseMentorId: 'basic-spanish',
     name: 'Mina',
-    roleTitle: 'AI & Deep Learning',
-    subject: 'Neural Networks, Attention & Representation Learning',
-    shortTag: 'AI & ML',
+    roleTitle: 'Basic Spanish & Conversation Coach',
+    subject: 'Basic Spanish (Everyday & Travel Spanish)',
+    shortTag: 'Basic Spanish',
     rivFile: '/riv/mina.riv',
-    accentColor: '#34d399',
-    secondaryColor: '#059669',
+    accentColor: '#f97316',
+    secondaryColor: '#ea580c',
   },
   {
-    baseMentorId: 'quantum-physicist',
+    baseMentorId: 'vibe-coding',
     name: 'Bolt',
-    roleTitle: 'Quantum & Robotics',
-    subject: 'Quantum Superposition, Entanglement & Control Systems',
-    shortTag: 'Quantum',
+    roleTitle: 'Vibe Coding & AI Product Builder',
+    subject: 'Vibe Coding (AI-Native App Building)',
+    shortTag: 'Vibe Coding',
     rivFile: '/riv/bolt.riv',
-    accentColor: '#6366f1',
-    secondaryColor: '#4338ca',
+    accentColor: '#a855f7',
+    secondaryColor: '#7e22ce',
   },
   {
-    baseMentorId: 'math-olympiad',
+    baseMentorId: 'dating-coach',
+    name: 'Sora',
+    roleTitle: 'Relationship & Social Confidence Coach',
+    subject: 'How to Make a Girlfriend (Dating & Social Skills)',
+    shortTag: 'Dating Coach',
+    rivFile: '/riv/sora.riv',
+    accentColor: '#ec4899',
+    secondaryColor: '#be185d',
+  },
+  {
+    baseMentorId: 'korea-history',
     name: 'Ms. Han',
-    roleTitle: 'Linear Algebra & Math',
-    subject: 'Linear Transformations, Eigenvalues & Proof Strategy',
-    shortTag: 'Pure Math',
+    roleTitle: 'Korean History & Cultural Storyteller',
+    subject: 'Korean History (5,000 Years of Korea)',
+    shortTag: 'Korea History',
     rivFile: '/riv/ms-han.riv',
     accentColor: '#f59e0b',
     secondaryColor: '#b45309',
   },
   {
-    baseMentorId: 'graphics-shader',
+    baseMentorId: 'algo-coach',
     name: 'Coach Pen',
-    roleTitle: 'Algorithms & Systems',
-    subject: 'Graph Search, Dynamic Programming & System Design',
+    roleTitle: 'Algorithm & Coding Interview Coach',
+    subject: 'Data Structures & Graph Algorithms',
     shortTag: 'Algorithms',
     rivFile: '/riv/coach-pen.riv',
-    accentColor: '#ec4899',
-    secondaryColor: '#be185d',
+    accentColor: '#34d399',
+    secondaryColor: '#059669',
   },
   {
-    baseMentorId: 'neuro-biologist',
-    name: 'Sora',
-    roleTitle: 'Neuroscience & Bio',
-    subject: 'Synaptic Transmission, Action Potentials & Proteins',
-    shortTag: 'Bio & Neuro',
-    rivFile: '/riv/sora.riv',
-    accentColor: '#a855f7',
-    secondaryColor: '#7e22ce',
-  },
-  {
-    baseMentorId: 'cyber-security',
-    name: 'Nabi',
-    roleTitle: 'Cybersecurity & Net',
-    subject: 'Zero-Trust Handshakes, Packet Routing & Exploit Defense',
-    shortTag: 'Security',
-    rivFile: '/riv/nabi.riv',
-    accentColor: '#f97316',
-    secondaryColor: '#c2410c',
-  },
-  {
-    baseMentorId: 'cloud-architect',
+    baseMentorId: 'ai-companion',
     name: 'Mong',
-    roleTitle: 'Distributed Cloud',
-    subject: 'Raft Consensus, Kubernetes & Global Service Mesh',
-    shortTag: 'Cloud Mesh',
+    roleTitle: 'AI & Neural Networks Mentor',
+    subject: 'AI, Transformers & Deep Learning',
+    shortTag: 'AI & LLMs',
     rivFile: '/riv/mong.riv',
-    accentColor: '#14b8a6',
-    secondaryColor: '#0f766e',
+    accentColor: '#f43f5e',
+    secondaryColor: '#be123c',
+  },
+  {
+    baseMentorId: 'astro-guide',
+    name: 'Nabi',
+    roleTitle: 'Astrophysics & Space Navigator',
+    subject: 'Astrophysics, Black Holes & Exoplanets',
+    shortTag: 'Cosmos',
+    rivFile: '/riv/nabi.riv',
+    accentColor: '#818cf8',
+    secondaryColor: '#4f46e5',
   },
   {
     baseMentorId: 'cs-professor',
     name: 'Prof. Jun',
-    roleTitle: 'OS Kernel Mentor',
-    subject: 'Virtual Memory, Page Tables & Kernel Scheduling',
-    shortTag: 'OS Kernel',
+    roleTitle: 'Computer Science 101 Professor',
+    subject: 'CS 101: Binary, Memory & OS Internals',
+    shortTag: 'CS 101',
     rivFile: '/riv/jun.riv',
     accentColor: '#38bdf8',
     secondaryColor: '#0284c7',
   },
   {
-    baseMentorId: 'data-scientist',
+    baseMentorId: 'basic-spanish',
     name: 'Mina',
-    roleTitle: 'Applied ML Mentor',
-    subject: 'Model Diagnostics, Fine-Tuning & Evaluation',
-    shortTag: 'Applied ML',
+    roleTitle: 'Spanish Travel & Tapas Coach',
+    subject: 'Basic Spanish: Greetings, Ser/Estar & Café Talk',
+    shortTag: 'Basic Spanish',
     rivFile: '/riv/mina.riv',
-    accentColor: '#34d399',
-    secondaryColor: '#059669',
+    accentColor: '#f97316',
+    secondaryColor: '#ea580c',
   },
   {
-    baseMentorId: 'quantum-physicist',
+    baseMentorId: 'vibe-coding',
     name: 'Bolt',
-    roleTitle: 'GPU Systems Mentor',
-    subject: 'CUDA Warps & Parallel Memory Banks',
-    shortTag: 'CUDA & GPU',
+    roleTitle: 'AI App & Prompt Architect',
+    subject: 'Vibe Coding: Prompting, UI Slices & Cloud Ship',
+    shortTag: 'Vibe Coding',
     rivFile: '/riv/bolt.riv',
-    accentColor: '#6366f1',
-    secondaryColor: '#4338ca',
+    accentColor: '#a855f7',
+    secondaryColor: '#7e22ce',
   },
   {
-    baseMentorId: 'math-olympiad',
+    baseMentorId: 'dating-coach',
+    name: 'Sora',
+    roleTitle: 'Dating & Charisma Coach',
+    subject: 'How to Make a Girlfriend: Openers & First Dates',
+    shortTag: 'Dating Coach',
+    rivFile: '/riv/sora.riv',
+    accentColor: '#ec4899',
+    secondaryColor: '#be185d',
+  },
+  {
+    baseMentorId: 'korea-history',
     name: 'Ms. Han',
-    roleTitle: 'Calculus & PDEs',
-    subject: 'Vector Fields & Differential Equations',
-    shortTag: 'Vector Calc',
+    roleTitle: 'Joseon & Hangul Historian',
+    subject: 'Korean History: Three Kingdoms, Sejong & Han Miracle',
+    shortTag: 'Korea History',
     rivFile: '/riv/ms-han.riv',
     accentColor: '#f59e0b',
     secondaryColor: '#b45309',
   },
   {
-    baseMentorId: 'graphics-shader',
+    baseMentorId: 'algo-coach',
     name: 'Coach Pen',
-    roleTitle: 'Architecture Coach',
-    subject: 'High-Throughput Distributed Caches',
-    shortTag: 'System Design',
+    roleTitle: 'Coding Interview Strategist',
+    subject: 'Graph Search, Trees & Big-O Mastery',
+    shortTag: 'Algorithms',
     rivFile: '/riv/coach-pen.riv',
-    accentColor: '#ec4899',
-    secondaryColor: '#be185d',
+    accentColor: '#34d399',
+    secondaryColor: '#059669',
   },
   {
-    baseMentorId: 'neuro-biologist',
-    name: 'Sora',
-    roleTitle: 'Cognitive Science',
-    subject: 'Memory Consolidation & Hebbian Learning',
-    shortTag: 'Neuroscience',
-    rivFile: '/riv/sora.riv',
-    accentColor: '#a855f7',
-    secondaryColor: '#7e22ce',
-  },
-  {
-    baseMentorId: 'cyber-security',
-    name: 'Nabi',
-    roleTitle: 'Binary Security',
-    subject: 'ROP Chains & Stack Canary Defense',
-    shortTag: 'Pwn & Reverse',
-    rivFile: '/riv/nabi.riv',
-    accentColor: '#f97316',
-    secondaryColor: '#c2410c',
-  },
-  {
-    baseMentorId: 'cloud-architect',
+    baseMentorId: 'ai-companion',
     name: 'Mong',
-    roleTitle: 'Database Internals',
-    subject: 'B+ Trees, LSM Trees & WAL Recovery',
-    shortTag: 'DB Internals',
+    roleTitle: 'LLM & Attention Researcher',
+    subject: 'Transformers, Embeddings & AI Agents',
+    shortTag: 'AI & LLMs',
     rivFile: '/riv/mong.riv',
-    accentColor: '#14b8a6',
-    secondaryColor: '#0f766e',
+    accentColor: '#f43f5e',
+    secondaryColor: '#be123c',
+  },
+  {
+    baseMentorId: 'astro-guide',
+    name: 'Nabi',
+    roleTitle: 'Black Hole & Exoplanet Guide',
+    subject: 'Relativistic Orbits & Deep Space',
+    shortTag: 'Cosmos',
+    rivFile: '/riv/nabi.riv',
+    accentColor: '#818cf8',
+    secondaryColor: '#4f46e5',
   },
 ];
 
@@ -345,7 +351,7 @@ export function WatchHoneycomb() {
     // Hold the colorful Mentos candy layout briefly on initial entry, then flip each candy over
     const flipTimer = setTimeout(() => {
       setIsMentosFlipped(true);
-    }, 320);
+    }, 80);
 
     return () => {
       window.removeEventListener('resize', updateViewport);
@@ -532,6 +538,7 @@ export function WatchHoneycomb() {
   const handleEnrollMentor = (cell: HoneycombCell) => {
     setIsEnrolling(true);
     const params = new URLSearchParams({
+      demo: 'true',
       name: cell.name,
       role: cell.roleTitle,
       subject: cell.subject,
@@ -1079,7 +1086,257 @@ export function WatchHoneycomb() {
         </section>
 
         {/* -------------------------------------------------------------------
-            02. HUMAN EDUCATOR MONITORING & PROFESSIONAL FEEDBACK (DUAL-LOOP DIAGRAM)
+            02. POWERED BY GEMINI ARGON: DIVERSE VISUAL EXPLANATIONS & FEEDBACK
+           ------------------------------------------------------------------- */}
+        <section className="max-w-5xl mx-auto px-6 sm:px-10 py-24 sm:py-32 border-t border-white/10">
+          <div className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold uppercase tracking-[0.2em] text-indigo-400">
+            <Sparkles className="w-3.5 h-3.5 text-sky-400" />
+            <span>Powered by Gemini Argon</span>
+          </div>
+
+          <h2 className="mt-4 text-4xl sm:text-6xl md:text-7xl font-bold tracking-[-0.035em] text-[#f5f5f7] leading-[1.04]">
+            Don&apos;t just read explanations.{' '}
+            <span className="bg-gradient-to-r from-sky-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent">
+              See them unfold visually.
+            </span>
+          </h2>
+
+          <p className="mt-8 max-w-3xl text-lg sm:text-2xl text-[#86868b] leading-relaxed font-normal">
+            Plain text hits a wall when explaining memory pointers, matrix
+            transformations, or distributed consensus. Powered by{' '}
+            <strong className="text-[#f5f5f7] font-semibold">
+              Gemini Argon
+            </strong>
+            , your Mentor synthesizes live interactive diagrams, spatial
+            simulations, and pinpoint visual feedback tailored to the exact
+            concept you&apos;re exploring.
+          </p>
+
+          {/* VISUAL SCHEMATIC: GEMINI ARGON MULTIMODAL EXPLANATION & FEEDBACK ENGINE */}
+          <div className="mt-16 pt-12 border-t border-white/10">
+            <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400 mb-10">
+              Gemini Argon Engine · Real-Time Visual Synthesis & Feedback Loop
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+              {/* LEFT HUB: MENTOR + GEMINI ARGON CORE */}
+              <div className="lg:col-span-4 flex flex-col items-center lg:items-start text-center lg:text-left">
+                <div className="flex items-center gap-4">
+                  <div className="relative">
+                    <span className="pointer-events-none absolute -inset-2 rounded-full bg-gradient-to-tr from-sky-500/25 via-indigo-500/25 to-purple-500/25 blur-md" />
+                    <RiveAvatar
+                      rivSrc="/riv/bolt.riv"
+                      state="talking"
+                      accentColor="#6366f1"
+                      secondaryColor="#38bdf8"
+                      discBackground={WATCH_DISC_PALETTES[6]}
+                      size={88}
+                      mentorName="Bolt"
+                      stateMachineName="Character"
+                    />
+                    <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-indigo-500 text-white whitespace-nowrap shadow">
+                      Gemini Argon
+                    </span>
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-indigo-400">
+                      Visual Synthesis Core
+                    </div>
+                    <div className="text-lg font-bold text-white mt-0.5">
+                      Bolt · Visual Engine
+                    </div>
+                    <div className="text-xs text-[#86868b]">
+                      Turns dialogue into live visual models
+                    </div>
+                  </div>
+                </div>
+
+                <p className="mt-5 text-xs sm:text-sm text-[#86868b] leading-relaxed">
+                  Whenever a concept is easier to grasp by seeing, Gemini Argon
+                  dynamically constructs visual explanations and annotates your
+                  work with visual feedback in real time.
+                </p>
+              </div>
+
+              {/* CENTER SVG 3-WAY GENERATIVE FAN-OUT */}
+              <div className="hidden lg:flex lg:col-span-2 items-center justify-center">
+                <svg
+                  viewBox="0 0 110 150"
+                  className="w-28 h-36 overflow-visible"
+                >
+                  <defs>
+                    <linearGradient
+                      id="argonGrad"
+                      x1="0%"
+                      y1="0%"
+                      x2="100%"
+                      y2="0%"
+                    >
+                      <stop offset="0%" stopColor="#38bdf8" />
+                      <stop offset="100%" stopColor="#a855f7" />
+                    </linearGradient>
+                  </defs>
+                  <path
+                    d="M 4 75 C 48 75, 52 20, 102 20"
+                    fill="none"
+                    stroke="url(#argonGrad)"
+                    strokeWidth="1.75"
+                  />
+                  <path
+                    d="M 4 75 L 102 75"
+                    fill="none"
+                    stroke="url(#argonGrad)"
+                    strokeWidth="1.75"
+                  />
+                  <path
+                    d="M 4 75 C 48 75, 52 130, 102 130"
+                    fill="none"
+                    stroke="url(#argonGrad)"
+                    strokeWidth="1.75"
+                  />
+                  <circle cx="4" cy="75" r="4" fill="#38bdf8" />
+                  <circle cx="102" cy="20" r="3.5" fill="#38bdf8" />
+                  <circle cx="102" cy="75" r="3.5" fill="#818cf8" />
+                  <circle cx="102" cy="130" r="3.5" fill="#34d399" />
+                </svg>
+              </div>
+
+              {/* RIGHT 3 VISUAL EXPLANATION & FEEDBACK MODES */}
+              <div className="lg:col-span-6 space-y-6">
+                {/* Mode 1: Dynamic Visual Diagrams & 3D Simulations */}
+                <div className="flex items-start gap-4 pb-5 border-b border-white/10">
+                  <div className="w-12 h-12 shrink-0 flex items-center justify-center">
+                    <svg
+                      viewBox="0 0 48 48"
+                      className="w-11 h-11 text-sky-400"
+                    >
+                      <polygon
+                        points="24,4 44,15 44,33 24,44 4,33 4,15"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.75"
+                      />
+                      <line
+                        x1="24"
+                        y1="24"
+                        x2="24"
+                        y2="44"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                      />
+                      <line
+                        x1="24"
+                        y1="24"
+                        x2="44"
+                        y2="15"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                      />
+                      <line
+                        x1="24"
+                        y1="24"
+                        x2="4"
+                        y2="15"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                      />
+                      <circle cx="24" cy="24" r="3" fill="#ffffff" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-sky-400">
+                      01 · Generative Visual Explanations
+                    </div>
+                    <h3 className="text-base sm:text-lg font-bold text-white mt-0.5">
+                      Live 3D scenes & interactive system diagrams.
+                    </h3>
+                    <p className="mt-1 text-xs sm:text-sm text-[#86868b] leading-relaxed">
+                      Gemini Argon translates abstract theory into manipulable
+                      3D structures, memory topology maps, and step-by-step
+                      state transitions right beside your conversation.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Mode 2: Annotated Visual Feedback on Misconceptions */}
+                <div className="flex items-start gap-4 pb-5 border-b border-white/10">
+                  <div className="w-12 h-12 shrink-0 flex items-center justify-center">
+                    <svg
+                      viewBox="0 0 48 48"
+                      className="w-11 h-11 text-indigo-400"
+                    >
+                      <path
+                        d="M 6 36 L 18 22 L 28 30 L 42 12"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      />
+                      <circle cx="18" cy="22" r="3" fill="#38bdf8" />
+                      <circle cx="28" cy="30" r="3.5" fill="#f43f5e" />
+                      <circle cx="42" cy="12" r="3" fill="#34d399" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-indigo-400">
+                      02 · Pinpoint Visual Feedback
+                    </div>
+                    <h3 className="text-base sm:text-lg font-bold text-white mt-0.5">
+                      Shows you exactly where your mental model diverged.
+                    </h3>
+                    <p className="mt-1 text-xs sm:text-sm text-[#86868b] leading-relaxed">
+                      Instead of generic text corrections, Gemini Argon
+                      highlights the exact step, pointer, or state transition
+                      that caused a bug and visually contrasts it with the
+                      optimal path.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Mode 3: Adaptive Visual Checkpoints */}
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 shrink-0 flex items-center justify-center">
+                    <svg
+                      viewBox="0 0 48 48"
+                      className="w-11 h-11 text-emerald-400"
+                    >
+                      <circle
+                        cx="24"
+                        cy="24"
+                        r="18"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.75"
+                        strokeDasharray="5 3"
+                      />
+                      <path
+                        d="M 16 24 L 22 30 L 33 18"
+                        fill="none"
+                        stroke="#34d399"
+                        strokeWidth="2.25"
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">
+                      03 · Interactive Visual Verification
+                    </div>
+                    <h3 className="text-base sm:text-lg font-bold text-white mt-0.5">
+                      Verify mastery by interacting, not memorizing.
+                    </h3>
+                    <p className="mt-1 text-xs sm:text-sm text-[#86868b] leading-relaxed">
+                      Test your intuition through visual checkpoints and live
+                      parameter tuning that give immediate visual confirmation
+                      as your understanding clicks.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* -------------------------------------------------------------------
+            03. HUMAN EDUCATOR MONITORING & PROFESSIONAL FEEDBACK (DUAL-LOOP DIAGRAM)
            ------------------------------------------------------------------- */}
         <section className="max-w-5xl mx-auto px-6 sm:px-10 py-24 sm:py-32 border-t border-white/10">
           <p className="text-xs sm:text-sm font-semibold uppercase tracking-[0.2em] text-emerald-400">
@@ -1476,7 +1733,7 @@ export function WatchHoneycomb() {
         <footer className="max-w-5xl mx-auto px-6 sm:px-10 py-12 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#86868b]">
           <div className="font-semibold text-[#f5f5f7]">Mentors</div>
           <div>
-            Proactive Level Diagnosis · Human-Supervised Mentorship
+            Powered by Gemini Argon · Proactive Level Diagnosis · Human-Supervised Mentorship
           </div>
         </footer>
       </div>

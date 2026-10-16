@@ -33,18 +33,24 @@ import type {
   LearnerSessionLog,
   MentorPromptConfig,
   ReferenceMaterial,
+  EngagedMentorStats,
 } from '@/types/admin';
 
 export default function AdminSupervisionPage() {
-  const [activeTab, setActiveTab] = useState<'learners' | 'submissions' | 'prompts'>('learners');
+  const [activeTab, setActiveTab] = useState<'learners' | 'submissions' | 'prompts' | 'mentors'>('learners');
 
   // Learners state
   const [learners, setLearners] = useState<LearnerSummary[]>([]);
   const [selectedLearnerId, setSelectedLearnerId] = useState<string>('demo-scholar-01');
+  const [activeMentorTrackId, setActiveMentorTrackId] = useState<string>('cs-professor');
+  const [profileViewMentorId, setProfileViewMentorId] = useState<string>('cs-professor');
   const [learnerDetail, setLearnerDetail] = useState<{
     learner: LearnerSummary;
+    engagedMentors: EngagedMentorStats[];
     submissions: QuizSubmissionRecord[];
     sessionLogs: LearnerSessionLog[];
+    allSubmissions: QuizSubmissionRecord[];
+    allSessionLogs: LearnerSessionLog[];
     diagnosticReport: AgentDiagnosticReport | null;
   } | null>(null);
 
@@ -54,6 +60,7 @@ export default function AdminSupervisionPage() {
 
   // Prompts & Directives state
   const [selectedMentorId, setSelectedMentorId] = useState<string>('cs-professor');
+
   const [promptConfig, setPromptConfig] = useState<MentorPromptConfig | null>(null);
   const [systemPersonaInput, setSystemPersonaInput] = useState<string>('');
   const [diagnosticGuidelinesInput, setDiagnosticGuidelinesInput] = useState<string>('');
@@ -88,17 +95,28 @@ export default function AdminSupervisionPage() {
   }, []);
 
   // 2. Fetch Selected Learner Detail
-  const loadLearnerDetail = useCallback(async (userId: string) => {
+  const loadLearnerDetail = useCallback(async (userId: string, mentorId?: string) => {
     try {
-      const res = await fetch(`/api/admin/learners/${userId}`);
+      const url = mentorId
+        ? `/api/admin/learners/${userId}?mentorId=${mentorId}`
+        : `/api/admin/learners/${userId}`;
+      const res = await fetch(url);
       const data = await res.json();
       if (data.ok) {
         setLearnerDetail({
           learner: data.learner,
+          engagedMentors: data.engagedMentors || [],
           submissions: data.submissions || [],
           sessionLogs: data.sessionLogs || [],
+          allSubmissions: data.allSubmissions || data.submissions || [],
+          allSessionLogs: data.allSessionLogs || data.sessionLogs || [],
           diagnosticReport: data.diagnosticReport || null,
         });
+
+        // Sync activeMentorTrackId if not currently in engaged list
+        if (!mentorId && data.learner?.activeMentorId) {
+          setActiveMentorTrackId(data.learner.activeMentorId);
+        }
       }
     } catch (err) {
       console.error('Failed to load learner detail:', err);
@@ -142,9 +160,9 @@ export default function AdminSupervisionPage() {
 
   useEffect(() => {
     if (selectedLearnerId) {
-      loadLearnerDetail(selectedLearnerId);
+      loadLearnerDetail(selectedLearnerId, activeMentorTrackId);
     }
-  }, [selectedLearnerId, loadLearnerDetail]);
+  }, [selectedLearnerId, activeMentorTrackId, loadLearnerDetail]);
 
   useEffect(() => {
     loadPromptConfig(selectedMentorId);
@@ -157,7 +175,7 @@ export default function AdminSupervisionPage() {
     }
   }, [targetStudentForDirective, promptConfig]);
 
-  // Trigger Gemini AI Diagnostic Summary
+  // Trigger Gemini AI Diagnostic Summary for the active track mentor
   const handleGenerateSummary = async () => {
     if (!selectedLearnerId) return;
     setIsLoadingSummary(true);
@@ -167,7 +185,7 @@ export default function AdminSupervisionPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: selectedLearnerId,
-          mentorId: selectedMentorId,
+          mentorId: activeMentorTrackId,
         }),
       });
       const data = await res.json();
@@ -175,7 +193,7 @@ export default function AdminSupervisionPage() {
         setLearnerDetail((prev) =>
           prev ? { ...prev, diagnosticReport: data.report } : null
         );
-        showToast('✨ AI diagnostic briefing generated successfully!');
+        showToast(`✨ ${currentTrackMentorObj?.name || 'Mentor'} AI diagnostic generated!`);
       }
     } catch (err) {
       console.error('Failed to generate summary:', err);
@@ -288,10 +306,12 @@ export default function AdminSupervisionPage() {
 
   const selectedLearner = learnerDetail?.learner;
   const currentMentorObj = MENTORS.find((m) => m.id === selectedMentorId) || MENTORS[0];
+  const currentTrackMentorObj = MENTORS.find((m) => m.id === activeMentorTrackId) || MENTORS[0];
 
   return (
     <div className="min-h-screen bg-black text-slate-100 flex flex-col font-sans selection:bg-sky-500/30">
       {/* Toast Notification */}
+
       {saveToast && (
         <div className="fixed top-5 right-5 z-50 bg-slate-900/95 border border-sky-500/40 text-sky-200 px-4 py-2.5 rounded-full shadow-2xl backdrop-blur-md flex items-center gap-2.5 text-xs animate-in fade-in slide-in-from-top-2 duration-200">
           <Sparkles className="w-4 h-4 text-sky-400 shrink-0" />
@@ -387,6 +407,21 @@ export default function AdminSupervisionPage() {
           <Sliders className="w-4 h-4" />
           <span>Prompt Engineering & Knowledge Base</span>
         </button>
+
+        <button
+          onClick={() => setActiveTab('mentors')}
+          className={`py-3 text-xs font-semibold tracking-wide transition border-b-2 flex items-center gap-2 ${
+            activeTab === 'mentors'
+              ? 'border-sky-400 text-sky-400'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Brain className="w-4 h-4" />
+          <span>Mentor Profiles & Agent Specs</span>
+          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/[0.08] text-slate-300">
+            {MENTORS.length}
+          </span>
+        </button>
       </div>
 
       {/* Main Content Area without bulky section boxes */}
@@ -425,12 +460,18 @@ export default function AdminSupervisionPage() {
               <div className="divide-y divide-white/[0.05] max-h-[680px] overflow-y-auto pr-1">
                 {filteredLearners.map((lrn) => {
                   const isSelected = lrn.userId === selectedLearnerId;
-                  const primaryLevel = lrn.mentorLevels['cs-professor'] || 'unassessed';
+                  const activeMentorObj = MENTORS.find((m) => m.id === (lrn.activeMentorId || 'cs-professor'));
+                  const engagedCount = lrn.engagedMentorIds?.length || Object.keys(lrn.mentorLevels || {}).length || 1;
 
                   return (
                     <div
                       key={lrn.userId}
-                      onClick={() => setSelectedLearnerId(lrn.userId)}
+                      onClick={() => {
+                        setSelectedLearnerId(lrn.userId);
+                        if (lrn.activeMentorId) {
+                          setActiveMentorTrackId(lrn.activeMentorId);
+                        }
+                      }}
                       className={`py-3.5 px-3 rounded-lg transition cursor-pointer flex flex-col gap-1.5 ${
                         isSelected
                           ? 'bg-white/[0.07] text-white'
@@ -448,19 +489,37 @@ export default function AdminSupervisionPage() {
                             </span>
                           )}
                         </div>
-                        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                          {primaryLevel}
-                        </span>
+
+                        {/* Active Mentor Badge */}
+                        {activeMentorObj && (
+                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-white/[0.08] text-slate-300 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: activeMentorObj.accentColor }} />
+                            <span>{activeMentorObj.name.split(' ')[0]}</span>
+                          </span>
+                        )}
                       </div>
 
-                      <div className="flex items-center gap-4 text-[11px] text-slate-500">
-                        <span>Accuracy: <strong className="text-emerald-400">{lrn.quizStats.accuracyRate}%</strong></span>
-                        <span>XP: <strong className="text-amber-400">{lrn.xpTotal}</strong></span>
-                        <span>Turns: <strong className="text-slate-300">{lrn.totalTurns}</strong></span>
+                      {/* Mentor engagement chips & subject */}
+                      <div className="flex items-center justify-between text-[11px] text-slate-500">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-slate-400 font-mono text-[10px]">
+                            {activeMentorObj?.shortTag || 'Mentor'}
+                          </span>
+                          {engagedCount > 1 && (
+                            <span className="text-[10px] px-1 rounded bg-white/[0.04] text-slate-400">
+                              +{engagedCount - 1} tracks
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px]">
+                          <span>Acc: <strong className="text-emerald-400">{lrn.quizStats.accuracyRate}%</strong></span>
+                          <span>XP: <strong className="text-amber-400">{lrn.xpTotal}</strong></span>
+                        </div>
                       </div>
                     </div>
                   );
                 })}
+
               </div>
             </div>
 
@@ -508,32 +567,126 @@ export default function AdminSupervisionPage() {
                     </div>
                   </div>
 
+                  {/* Mentor Engagement Track Selector (1-Click switch to inspect what is happening in each mentoring process) */}
+                  <div className="space-y-2 pb-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                        Mentoring Tracks & In-Progress Engagements
+                      </span>
+                      <span className="text-[11px] text-slate-500">
+                        Select a mentor to inspect their specific guidance & diagnostic trail
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2.5">
+                      {(learnerDetail?.engagedMentors && learnerDetail.engagedMentors.length > 0
+                        ? learnerDetail.engagedMentors
+                        : MENTORS.map((m) => ({
+                            id: m.id,
+                            name: m.name,
+                            roleTitle: m.roleTitle,
+                            subject: m.subject,
+                            shortTag: m.shortTag,
+                            accentColor: m.accentColor,
+                            secondaryColor: m.secondaryColor,
+                            studentLevel: selectedLearner.mentorLevels[m.id] || 'unassessed',
+                            submissionCount: 0,
+                            correctCount: 0,
+                            accuracyRate: null,
+                            logCount: 0,
+                          }))
+                      ).map((mTrack) => {
+                        const isCurrentTrack = mTrack.id === activeMentorTrackId;
+                        const isStudentActiveMentor = mTrack.id === (selectedLearner.activeMentorId || 'cs-professor');
+
+                        return (
+                          <button
+                            key={mTrack.id}
+                            onClick={() => setActiveMentorTrackId(mTrack.id)}
+                            className={`flex items-center gap-3 px-3.5 py-2 rounded-xl transition text-left cursor-pointer border ${
+                              isCurrentTrack
+                                ? 'bg-white/[0.08] border-white/20 text-white shadow-sm'
+                                : 'bg-transparent border-white/[0.06] text-slate-400 hover:text-slate-200 hover:bg-white/[0.03]'
+                            }`}
+                          >
+                            <span
+                              className="w-2 h-2 rounded-full shrink-0"
+                              style={{ backgroundColor: mTrack.accentColor }}
+                            />
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className={`text-xs font-semibold ${isCurrentTrack ? 'text-white' : 'text-slate-300'}`}>
+                                  {mTrack.name}
+                                </span>
+                                {isStudentActiveMentor && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-sky-500/20 text-sky-300">
+                                    Current
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 text-[10px] text-slate-500 mt-0.5">
+                                <span className="uppercase font-medium text-slate-400">{mTrack.studentLevel}</span>
+                                <span>·</span>
+                                <span>{mTrack.subject}</span>
+                                {mTrack.submissionCount > 0 && (
+                                  <>
+                                    <span>·</span>
+                                    <span className="text-emerald-400">{mTrack.submissionCount} quizzes</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   {/* Open Diagnostic Report Canvas (Borderless, typographic document style) */}
                   {learnerDetail?.diagnosticReport ? (
                     <div className="space-y-6 pt-2">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Brain className="w-4 h-4 text-sky-400" />
-                          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300">
-                            {currentMentorObj.name} AI Agent Diagnostic Briefing
+                        <div className="flex items-center gap-2.5">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full"
+                            style={{ backgroundColor: currentTrackMentorObj.accentColor }}
+                          />
+                          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-200">
+                            {currentTrackMentorObj.name} · Diagnostic Briefing
                           </h3>
-                        </div>
-                        {learnerDetail.diagnosticReport.confidenceScore && (
-                          <span className="text-xs text-slate-500">
-                            Diagnostic Confidence: <strong className="text-sky-400">{learnerDetail.diagnosticReport.confidenceScore}%</strong>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.06] text-slate-400">
+                            {currentTrackMentorObj.roleTitle}
                           </span>
-                        )}
+                        </div>
+                        <div className="flex items-center gap-4">
+                          {learnerDetail.diagnosticReport.confidenceScore && (
+                            <span className="text-xs text-slate-500">
+                              Diagnostic Confidence: <strong className="text-sky-400">{learnerDetail.diagnosticReport.confidenceScore}%</strong>
+                            </span>
+                          )}
+                          <button
+                            onClick={() => {
+                              setProfileViewMentorId(currentTrackMentorObj.id);
+                              setActiveTab('mentors');
+                            }}
+                            className="text-xs text-sky-400 hover:text-sky-300 font-medium transition cursor-pointer flex items-center gap-1"
+                          >
+                            <span>Profile & Specs</span>
+                            <ArrowRight className="w-3 h-3" />
+                          </button>
+                        </div>
                       </div>
 
                       {/* 1. Mastery Overview */}
                       <div className="space-y-1.5">
                         <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
-                          Conceptual Mastery Overview
+                          Conceptual Mastery & Competency Profile
                         </h4>
                         <p className="text-sm text-slate-200 leading-relaxed font-normal">
                           {learnerDetail.diagnosticReport.masterySummary}
                         </p>
                       </div>
+
 
                       {/* 2. Weaknesses & Learning Habits (Clean Side-by-Side) */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-2">
@@ -638,7 +791,7 @@ export default function AdminSupervisionPage() {
         {activeTab === 'submissions' && (
           <div className="space-y-6">
             {/* Filter toolbar (Clean borderless) */}
-            <div className="flex items-center justify-between pb-4 border-b border-white/[0.08]">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/[0.08]">
               <div className="flex items-center gap-6">
                 <button
                   onClick={() => setSubmissionTab('quizzes')}
@@ -646,7 +799,7 @@ export default function AdminSupervisionPage() {
                     submissionTab === 'quizzes' ? 'text-white' : 'text-slate-500 hover:text-slate-300'
                   }`}
                 >
-                  Quiz Submissions ({learnerDetail?.submissions.length || 0})
+                  Quiz Submissions ({filteredSubmissions.length})
                 </button>
                 <button
                   onClick={() => setSubmissionTab('dialogue')}
@@ -658,90 +811,126 @@ export default function AdminSupervisionPage() {
                 </button>
               </div>
 
-              {submissionTab === 'quizzes' && (
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="text-slate-500">Filter:</span>
-                  <select
-                    value={submissionsFilter}
-                    onChange={(e) => setSubmissionsFilter(e.target.value as any)}
-                    className="bg-transparent border-b border-white/[0.1] text-xs text-slate-300 py-1 px-2 focus:outline-none focus:border-sky-400"
-                  >
-                    <option value="all" className="bg-slate-900">All submissions</option>
-                    <option value="correct" className="bg-slate-900">Passed only</option>
-                    <option value="incorrect" className="bg-slate-900">Failed only</option>
-                  </select>
+              <div className="flex flex-wrap items-center gap-4 text-xs">
+                {/* Mentor Track Quick Filter */}
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500">Track:</span>
+                  <div className="flex items-center gap-1.5">
+                    {MENTORS.map((m) => {
+                      const isCurrent = m.id === activeMentorTrackId;
+                      return (
+                        <button
+                          key={m.id}
+                          onClick={() => setActiveMentorTrackId(m.id)}
+                          className={`text-[11px] px-2.5 py-1 rounded-full transition flex items-center gap-1.5 cursor-pointer ${
+                            isCurrent
+                              ? 'bg-white/[0.12] text-white font-medium border border-white/20'
+                              : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
+                          }`}
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: m.accentColor }} />
+                          <span>{m.name.split(' ')[0]}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              )}
+
+                {submissionTab === 'quizzes' && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-500">Result:</span>
+                    <select
+                      value={submissionsFilter}
+                      onChange={(e) => setSubmissionsFilter(e.target.value as any)}
+                      className="bg-transparent border-b border-white/[0.1] text-xs text-slate-300 py-1 px-2 focus:outline-none focus:border-sky-400"
+                    >
+                      <option value="all" className="bg-slate-900">All submissions</option>
+                      <option value="correct" className="bg-slate-900">Passed only</option>
+                      <option value="incorrect" className="bg-slate-900">Failed only</option>
+                    </select>
+                  </div>
+                )}
+              </div>
             </div>
+
 
             {/* Quiz Submissions Feed (Clean borderless list) */}
             {submissionTab === 'quizzes' && (
               <div className="divide-y divide-white/[0.06]">
                 {filteredSubmissions.length > 0 ? (
-                  filteredSubmissions.map((sub) => (
-                    <div key={sub.id} className="py-6 space-y-3">
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2.5">
-                          <span
-                            className={`font-semibold px-2 py-0.5 rounded text-[10px] uppercase tracking-wider ${
-                              sub.isCorrect
-                                ? 'bg-emerald-500/20 text-emerald-300'
-                                : 'bg-rose-500/20 text-rose-300'
-                            }`}
-                          >
-                            {sub.isCorrect ? 'PASS' : 'FAIL'}
+                  filteredSubmissions.map((sub) => {
+                    const subMentor = MENTORS.find((m) => m.id === sub.mentorId);
+                    return (
+                      <div key={sub.id} className="py-6 space-y-3">
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2.5">
+                            <span
+                              className={`font-semibold px-2 py-0.5 rounded text-[10px] uppercase tracking-wider ${
+                                sub.isCorrect
+                                  ? 'bg-emerald-500/20 text-emerald-300'
+                                  : 'bg-rose-500/20 text-rose-300'
+                              }`}
+                            >
+                              {sub.isCorrect ? 'PASS' : 'FAIL'}
+                            </span>
+                            {subMentor && (
+                              <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-white/[0.06] text-slate-300 flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: subMentor.accentColor }} />
+                                <span>{subMentor.name}</span>
+                              </span>
+                            )}
+                            <span className="font-mono text-slate-500 text-[11px]">#{sub.channelSlug || 'general'}</span>
+                            {sub.candyReward > 0 && (
+                              <span className="text-amber-300 font-medium text-[11px]">+{sub.candyReward} 🍬</span>
+                            )}
+                          </div>
+                          <span className="text-slate-500 text-[11px]">
+                            {new Date(sub.submittedAt).toLocaleString()}
                           </span>
-                          <span className="font-mono text-slate-500 text-[11px]">#{sub.channelSlug || 'general'}</span>
-                          {sub.candyReward > 0 && (
-                            <span className="text-amber-300 font-medium text-[11px]">+{sub.candyReward} 🍬</span>
-                          )}
                         </div>
-                        <span className="text-slate-500 text-[11px]">
-                          {new Date(sub.submittedAt).toLocaleString()}
-                        </span>
-                      </div>
 
-                      <h4 className="text-sm font-medium text-slate-100 leading-snug">
-                        {sub.questionText}
-                      </h4>
+                        <h4 className="text-sm font-medium text-slate-100 leading-snug">
+                          {sub.questionText}
+                        </h4>
 
-                      {/* Options comparison */}
-                      <div className="space-y-1.5 pt-1">
-                        {sub.options.map((opt, optIdx) => {
-                          const isStudentChoice = optIdx === sub.selectedOptionIndex;
-                          const isCorrectChoice = optIdx === sub.correctOptionIndex;
+                        {/* Options comparison */}
+                        <div className="space-y-1.5 pt-1">
+                          {sub.options.map((opt, optIdx) => {
+                            const isStudentChoice = optIdx === sub.selectedOptionIndex;
+                            const isCorrectChoice = optIdx === sub.correctOptionIndex;
 
-                          let textClass = 'text-slate-500';
-                          if (isCorrectChoice) textClass = 'text-emerald-300 font-medium';
-                          if (isStudentChoice && !sub.isCorrect) textClass = 'text-rose-400 font-medium';
+                            let textClass = 'text-slate-500';
+                            if (isCorrectChoice) textClass = 'text-emerald-300 font-medium';
+                            if (isStudentChoice && !sub.isCorrect) textClass = 'text-rose-400 font-medium';
 
-                          return (
-                            <div key={optIdx} className={`text-xs flex items-start gap-2 py-1 ${textClass}`}>
-                              <span className="font-mono text-[10px] opacity-70 shrink-0">[{optIdx + 1}]</span>
-                              <span className="flex-1">{opt}</span>
-                              {isStudentChoice && (
-                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-white/[0.08] text-slate-300 shrink-0">
-                                  Selected
-                                </span>
-                              )}
-                              {isCorrectChoice && (
-                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 shrink-0">
-                                  Correct
-                                </span>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      {sub.explanation && (
-                        <div className="text-xs text-slate-400 pl-3 border-l border-white/[0.1] pt-1 mt-2">
-                          <span className="text-slate-500 mr-1.5">Pedagogical Explanation:</span>
-                          {sub.explanation}
+                            return (
+                              <div key={optIdx} className={`text-xs flex items-start gap-2 py-1 ${textClass}`}>
+                                <span className="font-mono text-[10px] opacity-70 shrink-0">[{optIdx + 1}]</span>
+                                <span className="flex-1">{opt}</span>
+                                {isStudentChoice && (
+                                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-white/[0.08] text-slate-300 shrink-0">
+                                    Selected
+                                  </span>
+                                )}
+                                {isCorrectChoice && (
+                                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 shrink-0">
+                                    Correct
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
-                      )}
-                    </div>
-                  ))
+
+                        {sub.explanation && (
+                          <div className="text-xs text-slate-400 pl-3 border-l border-white/[0.1] pt-1 mt-2">
+                            <span className="text-slate-500 mr-1.5">Pedagogical Explanation:</span>
+                            {sub.explanation}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
                 ) : (
                   <div className="py-16 text-center text-xs text-slate-500">
                     No submissions matching the current filter.
@@ -756,17 +945,24 @@ export default function AdminSupervisionPage() {
                 {learnerDetail?.sessionLogs && learnerDetail.sessionLogs.length > 0 ? (
                   learnerDetail.sessionLogs.map((log) => {
                     const isUser = log.role === 'user';
+                    const logMentor = MENTORS.find((m) => m.id === log.mentorId);
+
                     return (
                       <div key={log.id} className="py-4 space-y-1.5">
                         <div className="flex items-center justify-between text-xs">
                           <div className="flex items-center gap-2">
                             <span
                               className={`text-[10px] font-bold uppercase tracking-wider ${
-                                isUser ? 'text-sky-400' : 'text-slate-400'
+                                isUser ? 'text-sky-400' : 'text-slate-300'
                               }`}
                             >
-                              {isUser ? 'Learner Inquiry' : 'Mentor Response'}
+                              {isUser ? 'Learner Inquiry' : logMentor?.name || 'Mentor Response'}
                             </span>
+                            {logMentor && (
+                              <span className="text-[10px] text-slate-500">
+                                · {logMentor.shortTag}
+                              </span>
+                            )}
                             {log.studentIntent && (
                               <span className="text-[10px] text-slate-500">
                                 #{log.studentIntent}
@@ -790,11 +986,12 @@ export default function AdminSupervisionPage() {
                   })
                 ) : (
                   <div className="py-16 text-center text-xs text-slate-500">
-                    No dialogue logs recorded yet.
+                    No dialogue logs recorded yet for this mentor track.
                   </div>
                 )}
               </div>
             )}
+
           </div>
         )}
 
@@ -974,6 +1171,298 @@ export default function AdminSupervisionPage() {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 4: Mentor Profiles & Agent Specs */}
+        {/* ========================================================================= */}
+        {activeTab === 'mentors' && (
+          <div className="space-y-10">
+            {/* Minimalist Header */}
+            <div className="flex items-center justify-between pb-6 border-b border-white/[0.06]">
+              <div>
+                <h2 className="text-base font-bold text-white tracking-tight">
+                  Autonomous Mentor Roster & Agent Specifications
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Inspect persona definitions, pedagogical styles, 3D spatial scenes, and starter prompts for all 8 specialized mentors.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Link
+                  href={`/mentor/${profileViewMentorId}`}
+                  target="_blank"
+                  className="flex items-center gap-2 text-xs font-semibold px-4 py-2 rounded-full bg-white/[0.08] hover:bg-white/[0.12] text-white transition"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-sky-400" />
+                  <span>Launch Live Studio</span>
+                </Link>
+                <button
+                  onClick={() => {
+                    setSelectedMentorId(profileViewMentorId);
+                    setActiveTab('prompts');
+                  }}
+                  className="flex items-center gap-2 text-xs font-semibold px-4 py-2 rounded-full bg-white text-black hover:bg-slate-200 transition cursor-pointer"
+                >
+                  <Sliders className="w-3.5 h-3.5 text-slate-800" />
+                  <span>Tune Prompts & Directives</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Mentor Horizontal Selector Carousel / Pill Bar */}
+            <div className="flex flex-wrap gap-2.5 pb-2">
+              {MENTORS.map((m) => {
+                const isSelected = m.id === profileViewMentorId;
+                // Count active learners on this mentor
+                const activeLearnersCount = learners.filter(
+                  (l) => (l.activeMentorId || 'cs-professor') === m.id
+                ).length;
+
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => setProfileViewMentorId(m.id)}
+                    className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition text-left cursor-pointer border ${
+                      isSelected
+                        ? 'bg-white/[0.08] border-white/20 text-white shadow-sm'
+                        : 'bg-transparent border-white/[0.06] text-slate-400 hover:text-slate-200 hover:bg-white/[0.03]'
+                    }`}
+                  >
+                    <span
+                      className="w-2.5 h-2.5 rounded-full shrink-0"
+                      style={{ backgroundColor: m.accentColor }}
+                    />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-semibold ${isSelected ? 'text-white' : 'text-slate-300'}`}>
+                          {m.name}
+                        </span>
+                        {activeLearnersCount > 0 && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-sky-500/20 text-sky-300">
+                            {activeLearnersCount} {activeLearnersCount === 1 ? 'scholar' : 'scholars'}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-slate-500 block truncate max-w-[160px]">
+                        {m.shortTag}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Active Selected Mentor Detailed Profile Inspector */}
+            {(() => {
+              const currentMentor = MENTORS.find((m) => m.id === profileViewMentorId) || MENTORS[0];
+              const mentorLearners = learners.filter(
+                (l) => (l.activeMentorId || 'cs-professor') === currentMentor.id
+              );
+
+              return (
+                <div className="space-y-10">
+                  {/* Hero Identity Overview */}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-8 border-b border-white/[0.06]">
+                    <div className="lg:col-span-2 space-y-4">
+                      <div className="flex items-center gap-3">
+                        <span
+                          className="w-3.5 h-3.5 rounded-full shadow-sm"
+                          style={{ backgroundColor: currentMentor.accentColor }}
+                        />
+                        <h3 className="text-xl font-bold text-white tracking-tight">
+                          {currentMentor.name}
+                        </h3>
+                        <span className="text-xs px-2.5 py-0.5 rounded-full bg-white/[0.08] text-slate-300 font-medium">
+                          {currentMentor.roleTitle}
+                        </span>
+                      </div>
+
+                      <p className="text-xs text-slate-300 leading-relaxed max-w-2xl">
+                        {currentMentor.description}
+                      </p>
+
+                      <div className="flex flex-wrap items-center gap-4 text-xs text-slate-400 pt-2">
+                        <div className="flex items-center gap-1.5">
+                          <GraduationCap className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Curriculum Domain:</span>
+                          <span className="text-slate-200 font-medium">{currentMentor.subject}</span>
+                        </div>
+                        <span>·</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: currentMentor.accentColor }} />
+                          <span>Primary Accent:</span>
+                          <code className="text-slate-300 font-mono text-[11px]">{currentMentor.accentColor}</code>
+                        </div>
+                        <span>·</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: currentMentor.secondaryColor }} />
+                          <span>Secondary Accent:</span>
+                          <code className="text-slate-300 font-mono text-[11px]">{currentMentor.secondaryColor}</code>
+                        </div>
+                        <span>·</span>
+                        <div className="flex items-center gap-1.5">
+                          <Compass className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Rive File:</span>
+                          <code className="text-slate-300 font-mono text-[11px]">{currentMentor.rivFile}</code>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Quick Active Student Summary */}
+                    <div className="space-y-3">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+                        Assigned Scholars ({mentorLearners.length})
+                      </span>
+                      {mentorLearners.length > 0 ? (
+                        <div className="space-y-2">
+                          {mentorLearners.map((lrn) => (
+                            <div
+                              key={lrn.userId}
+                              onClick={() => {
+                                setSelectedLearnerId(lrn.userId);
+                                setActiveMentorTrackId(currentMentor.id);
+                                setActiveTab('learners');
+                              }}
+                              className="flex items-center justify-between p-2 rounded-lg bg-white/[0.03] hover:bg-white/[0.07] transition cursor-pointer"
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-semibold text-white">{lrn.displayName}</span>
+                                <span className="text-[10px] text-slate-400 uppercase">
+                                  {lrn.mentorLevels[currentMentor.id] || 'unassessed'}
+                                </span>
+                              </div>
+                              <span className="text-[11px] text-sky-400 hover:underline">
+                                Inspect →
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-500 italic">
+                          No students are currently taking this mentor as their active lead.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* System Persona & Pedagogical Philosophy */}
+                  <div className="space-y-3 pb-8 border-b border-white/[0.06]">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                        System Persona & Pedagogical Philosophy
+                      </span>
+                      <button
+                        onClick={() => {
+                          setSelectedMentorId(currentMentor.id);
+                          setActiveTab('prompts');
+                        }}
+                        className="text-[11px] text-sky-400 hover:text-sky-300 font-medium transition"
+                      >
+                        Edit Persona in Prompt Studio →
+                      </button>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                      <p className="text-xs text-slate-200 leading-relaxed font-mono whitespace-pre-wrap">
+                        {currentMentor.systemPersona}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Starter Prompts & Socratic Templates */}
+                  <div className="space-y-3 pb-8 border-b border-white/[0.06]">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      Curated Socratic Inquiry Prompts ({currentMentor.starterPrompts.length})
+                    </span>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {currentMentor.starterPrompts.map((prompt, idx) => (
+                        <div
+                          key={idx}
+                          className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.05] flex items-start gap-3"
+                        >
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/[0.08] text-slate-400 shrink-0">
+                            #{idx + 1}
+                          </span>
+                          <p className="text-xs text-slate-300 leading-relaxed">
+                            {prompt}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 3D Spatial Scene Topology & Interactive Specification */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                        Default 3D Interactive Topology & Spatial Nodes
+                      </span>
+                      <span className="text-[10px] text-slate-500">
+                        Mode: {currentMentor.defaultScene3d.mode} · Camera: [{currentMentor.defaultScene3d.cameraPosition?.join(', ')}]
+                      </span>
+                    </div>
+
+                    <div className="space-y-3 p-4 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                      <div>
+                        <h4 className="text-xs font-bold text-white mb-1">
+                          {currentMentor.defaultScene3d.title}
+                        </h4>
+                        <p className="text-xs text-slate-400 leading-relaxed">
+                          {currentMentor.defaultScene3d.conceptSummary}
+                        </p>
+                      </div>
+
+                      {currentMentor.defaultScene3d.interactiveControlsHint && (
+                        <p className="text-[11px] text-sky-400/90 font-medium">
+                          ✦ {currentMentor.defaultScene3d.interactiveControlsHint}
+                        </p>
+                      )}
+
+                      {/* Nodes List */}
+                      {currentMentor.defaultScene3d.nodes && currentMentor.defaultScene3d.nodes.length > 0 && (
+                        <div className="pt-3 border-t border-white/[0.05] space-y-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                            Spatial Nodes ({currentMentor.defaultScene3d.nodes.length})
+                          </span>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                            {currentMentor.defaultScene3d.nodes.map((node) => (
+                              <div
+                                key={node.id}
+                                className="p-2.5 rounded-lg bg-white/[0.03] space-y-1 text-xs"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <span
+                                      className="w-2 h-2 rounded-full"
+                                      style={{ backgroundColor: node.color }}
+                                    />
+                                    <span className="font-semibold text-white text-[11px]">
+                                      {node.label || node.id}
+                                    </span>
+                                  </div>
+                                  <span className="text-[9px] uppercase px-1.5 py-0.2 rounded bg-white/[0.06] text-slate-400 font-mono">
+                                    {node.shape}
+                                  </span>
+                                </div>
+                                {node.tooltip && (
+                                  <p className="text-[10px] text-slate-400 line-clamp-2">
+                                    {node.tooltip}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
       </main>

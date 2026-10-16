@@ -111,7 +111,8 @@ ${logsDigest}
     const ai = getGenAIClient();
     const modelToUse = PRIMARY_ARGON_MODEL;
 
-    const response = await ai.models.generateContent({
+    // Timeout after 8 seconds to ensure fast UI response even if upstream network has latency
+    const callPromise = ai.models.generateContent({
       model: modelToUse,
       contents: prompt,
       config: {
@@ -123,7 +124,13 @@ ${logsDigest}
       },
     });
 
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Gemini API call timed out')), 8000)
+    );
+
+    const response = await Promise.race([callPromise, timeoutPromise]);
     const parsed = JSON.parse(response.text || '{}');
+
 
     return {
       userId: input.userId,

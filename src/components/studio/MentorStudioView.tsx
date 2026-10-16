@@ -3,25 +3,34 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import {
+  Bell,
   Box,
   Brain,
   CheckCircle2,
   ClipboardCheck,
   Compass,
+  FileText,
+  FolderOpen,
   Gamepad2,
   Hash,
   HelpCircle,
   Home,
   Image as ImageIcon,
+  Layers,
   Lightbulb,
   MessageSquare,
+  Mic,
+  Paperclip,
   Plus,
   RefreshCw,
   Send,
   ShoppingBag,
   Sparkles,
+  Video,
+  X,
   Zap,
 } from 'lucide-react';
+import type { CrossMentorNudgeResponse } from '@/app/api/mentor/proactive-nudge/route';
 import { RiveAvatar } from '@/components/avatar/RiveAvatar';
 import { Argon3DViewer } from '@/components/studio/Argon3DViewer';
 import { LearningMaterialPreviewCard } from '@/components/studio/LearningMaterialPreviewCard';
@@ -34,7 +43,9 @@ import {
   selectOptimalMaterialType,
 } from '@/lib/gemini/learningMaterialTemplates';
 import {
+  ChatAttachment,
   ChatMessage,
+  LearningMaterialProposal,
   LearningMaterialType,
   MentorAgentTurnResponse,
   MentorConfig,
@@ -49,6 +60,14 @@ export interface MentorStudioViewProps {
   mentor: MentorConfig;
   standaloneTestMode?: boolean;
 }
+
+const RIVE_STATES: { state: RiveAvatarState; label: string }[] = [
+  { state: 'idle', label: 'Idle' },
+  { state: 'thinking', label: 'Think' },
+  { state: 'talking', label: 'Talk' },
+  { state: 'happy', label: 'Happy' },
+  { state: 'sad', label: 'Sad' },
+];
 
 export type ProactiveNudgeType = '3d_pointout' | 'socratic_quiz' | 'real_world_tip';
 
@@ -80,17 +99,25 @@ interface ChannelThreadState {
   unread?: boolean;
 }
 
-const RIVE_STATES: {
-  state: RiveAvatarState;
-  label: string;
-  dotColor: string;
-}[] = [
-  { state: 'idle', label: 'idle', dotColor: '#38bdf8' },
-  { state: 'happy', label: 'happy', dotColor: '#34d399' },
-  { state: 'sad', label: 'sad', dotColor: '#60a5fa' },
-  { state: 'thinking', label: 'thinking', dotColor: '#fbbf24' },
-  { state: 'talking', label: 'talking', dotColor: '#ec4899' },
-];
+interface CollectedLearningMaterialItem {
+  id: string;
+  messageId: string;
+  channelId: string;
+  channelSlug: string;
+  channelTitle: string;
+  timestamp: string;
+  assessedLevel: StudentLevel;
+  material: LearningMaterialProposal;
+  scene3d: Scene3DSpec;
+  quiz: QuizQuestion;
+  proactiveBadge?: string;
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 const LEVEL_BADGE_MAP: Record<
   StudentLevel,
@@ -141,138 +168,138 @@ function buildCurriculumForMentor(mentor: MentorConfig): CurriculumChannel[] {
   const MENTOR_CURRICULUM_MAP: Record<string, ChannelTemplateSpec[]> = {
     'cs-professor': [
       {
-        slug: '01-pointers-and-memory',
-        title: 'Pointers, Stack Frames & Heap Allocation',
+        slug: '01-binary-and-logic-gates',
+        title: 'Binary Numbers, Logic Gates (AND/OR/XOR) & CPU ALU',
         summary:
-          'Visualize how stack frames store local variables and pointers dereference heap blocks in 3D.',
-        greeting: `Hey there! Welcome to **#01-pointers-and-memory**! 👋 I'm **${mentor.name}**. Before you even type, check out the 3D model on the right: notice how **${primaryNode}** holds an address pointing into **Heap Allocator**. Have you worked with pointers in C/C++ or Rust before, or should we start from the basics?`,
+          'Discover how 0s and 1s flow through logic gates inside the CPU ALU to compute everything in 3D.',
+        greeting: `Hey there! Welcome to **#01-binary-and-logic-gates**! 👋 I'm **${mentor.name}** (Computer Science 101). Look at **${primaryNode}** and **${secondaryNode}** in the 3D model on the right: every photo, game, and AI model is ultimately 0s and 1s switching through logic gates! Want to see how a Half-Adder adds binary numbers in 3D?`,
         prompts: [
-          'I am new to pointers—explain them with a simple 3D analogy!',
-          'Show me what happens in 3D when a dangling pointer or memory leak occurs.',
-          'Quiz me on stack vs. heap allocation speed!',
+          'Show me in 3D how XOR and AND gates build a Binary Half-Adder!',
+          'Why do computers use Binary (0 and 1) instead of Base-10?',
+          'Quiz me on Binary numbers and Logic Gates!',
         ],
         nodeColors: ['#38bdf8', '#6366f1', '#34d399'],
         quizQ:
-          'When a function returns in C/C++, what happens to its local stack frame compared to a heap-allocated block?',
+          'In a binary Half-Adder circuit adding two bits A and B, which logic gates compute the Sum bit and the Carry bit?',
         quizOpts: [
-          'The stack frame is popped in O(1) by moving the stack pointer, while heap memory persists until explicitly freed',
-          'Both stack and heap blocks are immediately erased by the CPU ALU',
-          'Heap memory is automatically popped before the stack frame returns',
-          'Stack frames require garbage collection sweeps on every clock cycle',
+          'XOR gate computes the Sum bit, and AND gate computes the Carry bit',
+          'NOT gate computes both Sum and Carry bits',
+          'OR gate computes the Carry bit, and NAND computes nothing',
+          'Binary addition does not use logic gates inside the ALU',
         ],
         quizCorrect: 0,
         quizExp:
-          'Stack allocation/deallocation simply adjusts the stack pointer register (ESP/RSP) in O(1), whereas heap allocations live until free() or GC reclamation.',
+          '1 + 1 in binary equals 10 (Sum = 0 via XOR, Carry = 1 via AND). Combining XOR and AND gives a complete 1-bit Half-Adder!',
         nudges: {
-          pointOut3D: `🔍 **3D Observation (#01-pointers-and-memory)**: Look at the purple **malloc()** packet flowing from **ALU Core #0** to **Heap Allocator** on the right. What do you think happens to that heap block if the local stack pointer holding its address is popped without calling \`free()\`?`,
-          socraticQuestion: `🎯 **Quick Socratic Check (+10 🍬)**: Why is allocating a local variable on the **Stack** roughy 100x faster than calling \`malloc()\` on the **Heap**? Try answering in one sentence!`,
-          realWorldTip: `💡 **Systems Tip from ${mentor.name}**: In real production bugs, **Use-After-Free (dangling pointer)** happens when a pointer still points to \`0x72\` after the heap block was freed. Want me to simulate a Use-After-Free state in the 3D viewer?`,
+          pointOut3D: `🔍 **3D Observation (#01-binary-and-logic-gates)**: Look at the cyan instruction bus flowing into **Binary & Logic Gates (ALU)** on the right. Notice how two 1-bits entering an XOR gate output 0 while firing the Carry bit!`,
+          socraticQuestion: `🎯 **Quick Socratic Check (+10 🍬)**: What is the decimal value of the 4-bit binary number \`1011\`? Try calculating it!`,
+          realWorldTip: `💡 **CS 101 Tip from ${mentor.name}**: Modern CPUs pack billions of microscopic MOSFET transistors that act as super-fast on/off switches for these exact logic gates!`,
           followUpChips: [
-            'Simulate a Use-After-Free bug in 3D!',
-            'Because the stack only increments RSP in O(1) while heap searches free lists!',
-            'Show me how Rust ownership prevents dangling pointers in 3D.',
+            '1011 in binary equals 8 + 0 + 2 + 1 = 11!',
+            'Build a 3D Binary Half-Adder with XOR + AND gates!',
+            'How does the CPU clock synchronize billions of gates?',
           ],
         },
       },
       {
-        slug: '02-cpu-cache-hierarchy',
-        title: 'L1/L2/L3 Cache Lines & Spatial Locality',
+        slug: '02-variables-stack-and-heap',
+        title: 'Variables, Pointers, Stack Frames & Heap Memory',
         summary:
-          'Inspect how 64-byte cache lines travel from DRAM to L1 cache and why contiguous arrays beat linked lists.',
-        greeting: `Welcome to **#02-cpu-cache-hierarchy**! ⚡ Let me ask you a warm-up question first: why does iterating over a contiguous array run up to 10x faster than traversing a pointer-chasing linked list of the exact same size? Check out **L1 Cache Line (64B)** in the 3D model on the right!`,
+          'Visualize how local variables live on the fast Stack while dynamic objects live on the Heap in 3D.',
+        greeting: `Welcome to **#02-variables-stack-and-heap**! ⚡ In CS 101, students often wonder where variables actually live in RAM. Check out **Stack Frame (Local Vars)** pointing to **Heap Memory (Objects)** in our 3D viewer on the right! Why do we need both a Stack and a Heap?`,
         prompts: [
-          'Explain 64-byte cache line prefetching in 3D!',
-          'Simulate a Cache Miss vs. Cache Hit in the 3D viewer.',
-          'Give me an interview-level quiz on false sharing!',
+          'Explain Stack vs. Heap memory using a 3D visual analogy!',
+          'Show me what happens in 3D when a pointer references an object on the Heap.',
+          'Give me a CS 101 quiz on Stack Overflow vs. Memory Leaks!',
         ],
         nodeColors: ['#f59e0b', '#38bdf8', '#10b981'],
         quizQ:
-          'Why does traversing a contiguous array exhibit much higher L1 cache hit rates than a linked list?',
+          'When a function finishes executing and returns, what happens to its local variables stored on the Call Stack?',
         quizOpts: [
-          'Spatial locality loads adjacent array elements together in a single 64-byte cache line fetch',
-          'Arrays bypass the CPU registers completely',
-          'Linked lists are stored exclusively inside the GPU VRAM',
-          'Arrays compress 64-bit integers into 1-bit flags automatically',
+          'Its stack frame is popped immediately in O(1) by moving the stack pointer, freeing that space automatically',
+          'They stay in RAM forever until you reboot the computer',
+          'They are moved onto the hard drive sector by sector',
+          'The CPU deletes the entire operating system',
         ],
         quizCorrect: 0,
         quizExp:
-          'CPUs fetch memory in 64-byte cache lines. Contiguous arrays pack neighbor elements into the same cache line, triggering hardware prefetching and L1 hits!',
+          'The Call Stack works Last-In, First-Out (LIFO). Returning from a function simply moves the stack pointer back, reclaiming local variables in O(1)!',
         nudges: {
-          pointOut3D: `🔍 **3D Observation (#02-cpu-cache-hierarchy)**: Watch the cyan **Cache Hit** connection between **L1 Cache Line (64B)** and **ALU Core #0**. Notice how short that path is compared to fetching from main heap memory! What happens to CPU cycles on an L1 miss?`,
-          socraticQuestion: `🎯 **Pop Question (+10 🍬)**: A CPU cache line is typically **64 bytes**. If you store an array of 4-byte \`int32\` values, how many integers get pulled into L1 cache in a single fetch?`,
-          realWorldTip: `💡 **High-Performance Tip**: Game engines use **Data-Oriented Design (Struct of Arrays)** instead of scattered objects specifically to keep the **L1 Cache Line (64B)** 100% full of useful data. Want to see AoS vs. SoA in 3D?`,
+          pointOut3D: `🔍 **3D Observation (#02-variables-stack-and-heap)**: Follow the purple **Pointer Ref** arrow from **Stack Frame (Local Vars)** to **Heap Memory (Objects)**. If you lose the stack pointer without freeing the heap object, you get a memory leak!`,
+          socraticQuestion: `🎯 **Pop Question (+10 🍬)**: What happens to the Call Stack if a recursive function calls itself infinitely without a base case?`,
+          realWorldTip: `💡 **CS 101 Pro Tip**: That famous error—**Stack Overflow**—literally means your program pushed so many stack frames that the Call Stack ran out of memory!`,
           followUpChips: [
-            '16 integers get loaded in a single 64-byte cache line!',
-            'Show me Struct-of-Arrays (SoA) vs Array-of-Structs in 3D!',
-            'What happens during multi-core False Sharing?',
+            'It causes a Stack Overflow because stack frames pile up endlessly!',
+            'Simulate a Recursive Stack Overflow in the 3D viewer!',
+            'Show me how Garbage Collection cleans up Heap objects in 3D.',
           ],
         },
       },
       {
-        slug: '03-trees-and-graphs-3d',
-        title: 'Self-Balancing Trees & Graph Topologies',
+        slug: '03-algorithms-and-big-o',
+        title: 'Sorting, Binary Search & Big-O Complexity in 3D',
         summary:
-          'Explore BST rotations, AVL/Red-Black balance invariants, and B+ Trees for storage engines.',
-        greeting: `Glad you jumped into **#03-trees-and-graphs-3d**! 🌲 I've loaded our 3D Binary Search Tree (**Root Node [0x40]**, **Left Subtree [0x28]**, **Right Subtree [0x72]**) on the right. Tell me—what happens to this tree's shape if you insert already-sorted numbers \`10, 20, 30, 40, 50\`?`,
+          'See why O(log N) Binary Search crushes O(N) Linear Scan and how Arrays vs. Trees organize data.',
+        greeting: `Glad you jumped into **#03-algorithms-and-big-o**! 🌲 Check out **Data Structures (Array / Tree)** in the 3D canvas. Imagine searching for a name in a phonebook of 1,000,000 people: checking page by page takes 1,000,000 steps, but **Binary Search** takes at most **20 steps**! Want to see why in 3D?`,
         prompts: [
-          'Show me in 3D how an AVL left-rotation fixes a skewed tree!',
-          'Why do databases use B+ Trees instead of binary trees?',
-          'Challenge me with a tree rotation Candy quiz!',
+          'Show me in 3D how Binary Search cuts the search space in half every step!',
+          'Compare O(1), O(log N), O(N), and O(N²) growth in 3D!',
+          'Challenge me with a Big-O Complexity Candy quiz!',
         ],
         nodeColors: ['#34d399', '#38bdf8', '#a855f7'],
         quizQ:
-          'If sorted keys are inserted sequentially into an unbalanced Binary Search Tree, what does worst-case lookup time degrade to?',
+          'What is the maximum number of comparisons Binary Search needs to find an item in a sorted array of 1,024 elements?',
         quizOpts: [
-          'O(N) — it degenerates into a singly linked list',
-          'O(1) — it becomes a direct hash table',
-          'O(log log N) — it compresses height automatically',
-          'O(N^3) — it creates cycles between leaf nodes',
+          'At most 10 comparisons (since log₂(1024) = 10)',
+          '1,024 comparisons',
+          '1,048,576 comparisons',
+          '512 comparisons minimum',
         ],
         quizCorrect: 0,
         quizExp:
-          'Inserting sorted keys without self-balancing rotations creates a degenerate chain of right-child pointers, turning O(log N) search into O(N).',
+          'Each comparison halves the remaining array: 1024 → 512 → 256 → 128 → 64 → 32 → 16 → 8 → 4 → 2 → 1, which is log₂(1024) = 10 steps!',
         nudges: {
-          pointOut3D: `🔍 **3D Observation (#03-trees-and-graphs-3d)**: Look at **Root Node [0x40]** branching to **Left Subtree [0x28]** and **Right Subtree [0x72]**. Because it's balanced, 1 million keys only need ~20 hops. Want me to animate an AVL tree rotation in 3D?`,
-          socraticQuestion: `🎯 **Socratic Check (+10 🍬)**: Why do SSD databases like PostgreSQL and MySQL use wide **B+ Trees** instead of tall Binary Search Trees? (Hint: think about our previous cache/page course!)`,
-          realWorldTip: `💡 **Interview Insight**: Linux's Completely Fair Scheduler (CFS) uses a **Red-Black Tree** indexed by \`vruntime\` so picking the next task is always fast. Want to visualize a Red-Black Tree in 3D?`,
+          pointOut3D: `🔍 **3D Observation (#03-algorithms-and-big-o)**: Look at how **Data Structures (Array / Tree)** branches out in 3D. Halving the problem at each level is the secret behind \`O(log N)\` speed!`,
+          socraticQuestion: `🎯 **Socratic Check (+10 🍬)**: Why must an array be **sorted** before you can run Binary Search on it?`,
+          realWorldTip: `💡 **CS 101 Insight**: Hash Tables give you \`O(1)\` average lookup by computing an index directly from the key, while Binary Search Trees keep items sorted in \`O(log N)\`!`,
           followUpChips: [
-            'Animate an AVL tree rotation in the 3D viewer!',
-            'B+ Trees pack many keys per 4KB disk page to minimize I/O hops!',
-            'Visualize Linux CFS Red-Black Tree scheduling in 3D!',
+            'Because you need order to know whether to eliminate the left half or right half!',
+            'Visualize a Hash Table vs. Binary Search Tree in 3D!',
+            'Show me QuickSort partitioning in the 3D viewer!',
           ],
         },
       },
       {
-        slug: '04-os-virtual-memory',
-        title: 'Virtual Memory, Page Tables & TLB',
+        slug: '04-os-and-internet-packets',
+        title: 'Operating Systems, Processes & How the Internet Works',
         summary:
-          'How the MMU and TLB translate virtual addresses to physical RAM frames and handle page faults.',
-        greeting: `Welcome to **#04-os-virtual-memory**! 🖥️ Here we explore how every process gets its own private 64-bit address space illusion. Want me to walk you through a **TLB Hit vs. Page Fault** in 3D?`,
+          'Follow how the OS schedules processes on the CPU and how TCP/IP packets travel from browser to server.',
+        greeting: `Welcome to **#04-os-and-internet-packets**! 🌐 Ever wondered what actually happens in the 50 milliseconds after you type a URL and press Enter? Let's trace **DNS → TCP Handshake → HTTP Packet → OS Process** in 3D!`,
         prompts: [
-          'Trace a Virtual-to-Physical address translation in 3D!',
-          'What happens inside the OS kernel during a Minor vs. Major Page Fault?',
-          'Give me a Candy quiz on TLB shootdowns and multi-level page tables!',
+          'Trace a web request from Browser → DNS → TCP/IP → Server in 3D!',
+          'How does the Operating System run dozens of apps at once on a CPU?',
+          'Give me a CS 101 Boss Quiz on Operating Systems & Networking!',
         ],
         nodeColors: ['#818cf8', '#ec4899', '#38bdf8'],
         quizQ:
-          'What is the role of the TLB (Translation Lookaside Buffer) inside the CPU MMU?',
+          'What is the main purpose of DNS (Domain Name System) when you visit a website?',
         quizOpts: [
-          'It caches recent virtual-to-physical page table translations to avoid slow multi-level page walks in RAM',
-          'It encrypts network packets before they leave the NIC',
-          'It schedules threads onto GPU shader cores',
-          'It stores BIOS firmware strings on boot',
+          'It translates human-readable domain names (like google.com) into numerical IP addresses that routers use to route packets',
+          'It cools down the CPU fan when browsing',
+          'It compiles C++ code inside your keyboard',
+          'It deletes local variables from the Call Stack',
         ],
         quizCorrect: 0,
         quizExp:
-          'Walking a 4-level page table in RAM takes multiple memory accesses. The hardware TLB caches hot translations so virtual addresses resolve in ~1 cycle.',
+          'Routers forward packets using IP addresses (e.g., 142.250.190.46). DNS acts as the internet phonebook translating domain names into IP addresses.',
         nudges: {
-          pointOut3D: `🔍 **3D Observation (#04-os-virtual-memory)**: When your code dereferences address \`0x72\`, the CPU doesn't go straight to RAM—it checks the **TLB** first. Want to see the 4-level page table walk in 3D when a TLB miss happens?`,
-          socraticQuestion: `🎯 **Pop Question (+10 🍬)**: When you call \`fork()\` in Linux, does the OS immediately copy all gigabytes of RAM, or does it use a clever trick with page table permissions?`,
-          realWorldTip: `💡 **Production Tip**: High-frequency trading & database servers enable **HugePages (2MB / 1GB)** so the hardware TLB can cover gigabytes of RAM without TLB misses!`,
+          pointOut3D: `🔍 **3D Observation (#04-os-and-internet-packets)**: Watch how the OS kernel shares CPU time slices across processes while network packets arrive asynchronously!`,
+          socraticQuestion: `🎯 **Pop Question (+10 🍬)**: What is the difference between **TCP** (used for web pages & messages) and **UDP** (used for live gaming & video calls)?`,
+          realWorldTip: `💡 **CS 101 Takeaway**: TCP guarantees ordered delivery with a 3-way handshake and retransmissions, while UDP blasts packets out with minimal delay!`,
           followUpChips: [
-            'It uses Copy-on-Write (CoW) by marking pages read-only first!',
-            'Model a 4-level Page Table + TLB Miss in 3D!',
-            'Explain how 2MB HugePages reduce TLB misses.',
+            'TCP guarantees reliable ordered delivery while UDP prioritizes low-latency speed!',
+            'Model the TCP 3-Way Handshake (SYN, SYN-ACK, ACK) in 3D!',
+            'Show me how OS Context Switching swaps CPU registers in 3D!',
           ],
         },
       },
@@ -375,397 +402,396 @@ function buildCurriculumForMentor(mentor: MentorConfig): CurriculumChannel[] {
           'An admissible heuristic h(n) <= h*(n) ensures A* never skips a potentially optimal path before expanding the goal.',
       },
     ],
-    'physics-lab': [
+    'basic-spanish': [
       {
-        slug: '01-kepler-orbital-mechanics',
-        title: 'Keplerian Orbits & Centripetal Force Balance',
+        slug: '01-hola-greetings-and-pronunciation',
+        title: '¡Hola! Core Greetings, Self-Intro & Spanish Vowels',
         summary:
-          'Explore how gravitational attraction F = GMm/r² balances orbital velocity around a central star in 3D.',
-        greeting: `Hey explorer! I'm **${mentor.name}**! 🚀 Welcome to **#01-kepler-orbital-mechanics**! Look at **Central Star (M₀)** and **Planet Alpha** in our 3D lab on the right. Quick question: if Gravity pulls **Planet Alpha** inward, why doesn't it crash into the star?`,
+          'Master the 5 crisp Spanish vowel sounds (A, E, I, O, U) and introduce yourself naturally from Day 1.',
+        greeting: `¡Hola, amigo! 🇪🇸💃 I'm **${mentor.name}** (Basic Spanish)! Welcome to **#01-hola-greetings-and-pronunciation**! Check out **¡Hola! Greeting Hub** in our 3D scene on the right. Notice how Spanish vowels (**a, e, i, o, u**) each have only ONE pure sound! Try saying *"¡Hola! Me llamo..."*—how are you feeling today: *¿Muy bien* or *más o menos*?`,
         prompts: [
-          'Explain why an orbiting planet is in perpetual free-fall in 3D!',
-          'What happens in the 3D orbit if we suddenly double Planet Alpha’s velocity?',
-          'Quiz me on Kepler’s Laws and orbital velocity!',
+          'Teach me the 5 Spanish vowel sounds and basic greetings with a 3D map!',
+          'How do I introduce myself and ask someone’s name in Spanish?',
+          'Quiz me on ¡Hola!, Buenos días, and Me llamo!',
         ],
-        nodeColors: ['#f59e0b', '#38bdf8', '#fbbf24'],
+        nodeColors: ['#f97316', '#facc15', '#ec4899'],
         quizQ:
-          'For a planet in a circular orbit of radius r around a star of mass M, how does orbital speed v depend on radius r?',
+          'How do you naturally say "My name is Alex, nice to meet you!" in Spanish?',
         quizOpts: [
-          'v = sqrt(G·M / r) — inner planets orbit faster than outer planets',
-          'v increases linearly with radius r',
-          'All planets move at the exact same speed regardless of distance',
-          'v depends only on the planet’s color',
+          '¡Me llamo Alex, mucho gusto!',
+          '¡Tengo hambre Alex, hasta luego!',
+          '¡Dónde está el baño Alex!',
+          '¡La cuenta por favor Alex!',
         ],
         quizCorrect: 0,
         quizExp:
-          'Setting gravitational force GMm/r² equal to centripetal force mv²/r gives v = sqrt(GM/r), so closer orbits require higher speed!',
+          '"Me llamo..." literally means "I call myself..." and "¡Mucho gusto!" means "Nice to meet you!"',
       },
       {
-        slug: '02-lagrange-points-and-gravity',
-        title: 'Lagrange Equilibrium Points (L1–L5) & Tidal Locking',
+        slug: '02-ser-vs-estar-and-verbs',
+        title: 'Ser vs. Estar (DOCTOR vs. PLACE) & Core Action Verbs',
         summary:
-          'Visualize gravitational saddle points where two-body forces and centrifugal acceleration cancel out.',
-        greeting: `Welcome to **#02-lagrange-points-and-gravity**! 🛰️ Spot the purple **Lagrange Point L1** cone between **Central Star (M₀)** and **Exo-Giant Beta** in the 3D viewer! Do you know why NASA parks space telescopes at Lagrange points?`,
+          'Never confuse the two "to be" verbs again using a 3D spatial memory map of identity vs. state.',
+        greeting: `¡Bienvenido to **#02-ser-vs-estar-and-verbs**! 🌟 Look at **Ser (Identity / Origin)** and **Estar (Emotion / Location)** on the right! In English both mean *"to be"*, so why does *"Soy aburrido"* mean *"I'm a boring person"* while *"Estoy aburrido"* means *"I'm feeling bored right now"*? Let's unlock this in 3D!`,
         prompts: [
-          'Show me in 3D how forces cancel out at Lagrange Point L1 and L2!',
-          'Why are L4 and L5 stable while L1, L2, and L3 are unstable?',
-          'Give me a Candy quiz on Lagrange equilibria!',
+          'Show me in 3D the difference between Ser (Identity) and Estar (State/Location)!',
+          'Why does "Soy listo" vs. "Estoy listo" change meaning completely?',
+          'Give me a Candy quiz on Ser vs. Estar!',
         ],
-        nodeColors: ['#a855f7', '#f59e0b', '#ef4444'],
+        nodeColors: ['#facc15', '#34d399', '#f97316'],
         quizQ:
-          'Why is Lagrange Point L1 useful for solar observation spacecraft?',
+          'Which Spanish sentence correctly says "I am in Madrid right now, and I am from Korea"?',
         quizOpts: [
-          'The combined gravity of the Star and Planet balances centrifugal force, letting the craft orbit with the same period as the planet',
-          'Gravity is completely absent across the entire solar system',
-          'It teleports spacecraft faster than light',
-          'It shields the craft behind the planet’s shadow at all times',
+          'Estoy en Madrid ahora, y soy de Corea.',
+          'Soy en Madrid ahora, y estoy de Corea.',
+          'Tener en Madrid ahora, y hablar de Corea.',
+          'Quiero Madrid ahora, y vamos de Corea.',
         ],
         quizCorrect: 0,
         quizExp:
-          'At L1, the planet’s inward pull slightly reduces the star’s net pull, matching the planet’s angular orbital period.',
+          'Physical location uses ESTAR ("Estoy en Madrid"), whereas permanent origin/nationality uses SER ("Soy de Corea")!',
       },
       {
-        slug: '03-electromagnetic-flux-3d',
-        title: 'Lorentz Force, Magnetic Flux & Faraday Induction',
+        slug: '03-tapas-cafe-and-travel-roleplay',
+        title: 'Tapas Café Ordering, Numbers & Survival Travel Phrases',
         summary:
-          'Model 3D charged particle spirals in magnetic fields (F = qv × B) and induced EMF loops.',
-        greeting: `Welcome to **#03-electromagnetic-flux-3d**! ⚡ When a charged particle enters a magnetic field perpendicular to its velocity, the cross-product force \`F = q(v × B)\` bends it into a 3D helix! Want to see that 3D trajectory right now?`,
+          'Roleplay ordering churros, tapas, and coffee in Madrid or Mexico City with polite confidence.',
+        greeting: `¡Vamos a comer! ☕🥘 Welcome to **#03-tapas-cafe-and-travel-roleplay**! Look at **Tapas Café Roleplay** in the 3D viewer. Imagine you just walked into a sunny café in Barcelona—how do you politely order a coffee and ask for the check without sounding like a textbook?`,
         prompts: [
-          'Model a charged particle spiraling through a 3D magnetic field!',
-          'Visualize Faraday’s Law of Induction when magnetic flux changes in 3D.',
-          'Quiz me on the Right-Hand Rule and Lorentz force!',
+          'Roleplay ordering tapas and coffee with me in a 3D Spanish café!',
+          'Why is "Quisiera..." or "Me pone..." much more natural than "Yo quiero..."?',
+          'Quiz me on Spanish restaurant & travel survival phrases!',
         ],
-        nodeColors: ['#38bdf8', '#ef4444', '#fbbf24'],
+        nodeColors: ['#ec4899', '#f97316', '#38bdf8'],
         quizQ:
-          'How much mechanical work does a static magnetic field perform on a moving electric charge?',
+          'At a café in Spain or Latin America, what is the polite, natural way to ask the waiter for the bill?',
         quizOpts: [
-          'Zero work — the magnetic force F = q(v × B) is always perpendicular to velocity v',
-          'Infinite work along the direction of motion',
-          'Work proportional to the square of mass',
-          'Negative work that stops the particle instantly',
+          '¿Me trae la cuenta, por favor?',
+          '¿Dónde está la biblioteca, por favor?',
+          '¡Dame todo el dinero ahora!',
+          '¿Cuántos años tienes, por favor?',
         ],
         quizCorrect: 0,
         quizExp:
-          'Because the cross product v × B is always perpendicular to v, magnetic forces change a particle’s direction without changing its kinetic energy.',
+          '"La cuenta, por favor" or "¿Me trae la cuenta, por favor?" is the universal, polite way to ask for the check.',
       },
       {
-        slug: '04-quantum-wave-tunneling',
-        title: 'Quantum Wavefunctions & Barrier Tunneling in 3D',
+        slug: '04-past-tense-and-daily-stories',
+        title: 'Talking About Your Day, Gustar & Everyday Conversation',
         summary:
-          'Inspect probability amplitude shells |ψ|² and evanescent wave decay through potential barriers.',
-        greeting: `Welcome to **#04-quantum-wave-tunneling**! ⚛️ Check out **Outer Quantum Shell (r=3.2)** in our 3D viewer! In classical physics, a ball without enough energy can never cross a wall—how does a quantum wavefunction pull it off?`,
+          'Express what you love (Me gusta / Me encanta), your plans (Voy a...), and stories with friends.',
+        greeting: `¡Increíble! 🏆 You made it to **#04-past-tense-and-daily-stories**! Let's learn how to talk about your favorite music, food, and weekend plans using **Me gusta / Me encanta** and **Ir + a + infinitivo**!`,
         prompts: [
-          'Visualize 3D Quantum Barrier Tunneling and probability amplitude decay!',
-          'Explain wave-particle duality and standing orbital harmonics in 3D.',
-          'Launch the +35 Candy Physics Boss Quiz!',
+          'Show me in 3D how "Me gusta el café" vs "Me gustan los tacos" works!',
+          'Let’s have a 3-turn Spanish mini-conversation about my weekend plans!',
+          'Launch the +35 Candy Basic Spanish Boss Quiz!',
         ],
-        nodeColors: ['#ef4444', '#a855f7', '#38bdf8'],
+        nodeColors: ['#34d399', '#facc15', '#ec4899'],
         quizQ:
-          'What happens to a quantum particle’s wavefunction ψ(x) inside a finite potential energy barrier where E < V₀?',
+          'Why do we say "Me gusta la música" (singular) but "Me gustan los libros" (plural) in Spanish?',
         quizOpts: [
-          'It decays exponentially (evanescent wave) rather than dropping to zero instantly, allowing non-zero transmission if the barrier is thin',
-          'It explodes to infinite amplitude inside the barrier',
-          'It turns into a classical rigid billiard ball',
-          'Its wavelength becomes zero everywhere',
+          'Because "gustar" literally means "to be pleasing to me", so the verb agrees with the thing that pleases you',
+          'Because "libros" is a verb in the future tense',
+          'Because plural nouns are never allowed after "me"',
+          'They are spelled the exact same way',
         ],
         quizCorrect: 0,
         quizExp:
-          'Solving the Schrödinger equation for E < V₀ yields an exponential decay across the barrier; if the barrier is narrow, a non-zero amplitude emerges on the far side!',
+          'In "Me gustan los libros", "los libros" is the grammatical subject ("the books are pleasing to me"), so gustar becomes plural (gustan)!',
       },
     ],
-    'math-wizard': [
+    'vibe-coding': [
       {
-        slug: '01-basis-vectors-and-span',
-        title: 'Basis Vectors (î, ĵ, k̂), Linear Combinations & Span',
+        slug: '01-vibe-spec-and-prompt-architecture',
+        title: 'Vibe Spec Writing: Turning Ideas into Crisp AI Prompts',
         summary:
-          'See how coordinate systems are built by scaling and adding basis vectors in 3D geometric space.',
-        greeting: `Hello! I'm **${mentor.name}**! ✨ Welcome to **#01-basis-vectors-and-span**. Look at **Origin O (0,0,0)**, **Basis î [1, 0, 0]**, and **Basis ĵ [0, 1, 0]** in our 3D space on the right. Every matrix multiplication is really just moving those basis vectors to new landing spots! Ready to see how?`,
+          'Structure your product vision, constraints, and stack so AI code generators build the right thing on the first shot.',
+        greeting: `Yo builder! ⚡🎧 I'm **${mentor.name}** (Vibe Coding)! Welcome to **#01-vibe-spec-and-prompt-architecture**! Check out **Product Vibe Spec** flowing into **AI Code Generator** in our 3D loop on the right. Why do vague prompts like *"build me a cool app"* produce broken spaghetti, while a 5-bullet **Vibe Spec** ships magic?`,
         prompts: [
-          'Show me in 3D how columns of a matrix represent transformed basis vectors!',
-          'What happens geometrically when two 3D vectors are linearly dependent?',
-          'Quiz me on Span and Linear Independence!',
+          'Show me the 3D anatomy of a perfect Vibe Coding Spec prompt!',
+          'How do I break a full app idea into small, verifiable AI slices?',
+          'Quiz me on Vibe Spec prompt architecture!',
         ],
-        nodeColors: ['#38bdf8', '#34d399', '#a855f7'],
+        nodeColors: ['#a855f7', '#38bdf8', '#34d399'],
         quizQ:
-          'Geometrically, what do the columns of a 3×3 transformation matrix A represent?',
+          'In Vibe Coding, what is the biggest advantage of writing a structured "Vibe Spec" (Goal + UI flow + Data shape + Constraints) before generating code?',
         quizOpts: [
-          'The exact 3D coordinates where the standard basis vectors î, ĵ, and k̂ land after the transformation',
-          'Random scalars unrelated to coordinate axes',
-          'The roots of a 9th-degree polynomial',
-          'Only the translation offset of the origin',
+          'It anchors the AI’s context window on exact user flows, file boundaries, and states instead of letting it hallucinate architecture',
+          'It makes the AI run without electricity',
+          'It forces you to write every line in assembly language manually',
+          'It disables TypeScript type checking',
         ],
         quizCorrect: 0,
         quizExp:
-          'Multiplying A by î = [1,0,0]ᵀ extracts the first column of A—meaning each column shows where a unit basis vector lands!',
+          'Giving the AI explicit data shapes, UI states, and file boundaries keeps generation surgical and prevents architectural drift.',
       },
       {
-        slug: '02-matrix-transformations-det',
-        title: '3D Rotations, Shears & The Determinant as Volume Scaling',
+        slug: '02-ai-ui-and-3d-canvas-prototyping',
+        title: 'Rapid UI, Tailwind & Interactive 3D Canvas Prototyping',
         summary:
-          'Watch the unit sphere deform into a 3D ellipsoid and measure how det(A) scales 3D volume.',
-        greeting: `Welcome to **#02-matrix-transformations-det**! 🔮 Check out the wireframe **Transformed Ellipsoid det(A)** in our 3D viewer on the right! Tell me: if a 3D matrix has \`det(A) = 0\`, what happened to our 3D space?`,
+          'Iterate on glassmorphic UI components, micro-animations, and Three.js / Rive scenes in seconds.',
+        greeting: `Welcome to **#02-ai-ui-and-3d-canvas-prototyping**! 🎨 Look at **Live Preview & UI State** in the 3D viewer on the right! When you're vibe-coding a frontend, how do you prompt for tactile micro-interactions, responsive layouts, and zero-lag 3D canvases?`,
         prompts: [
-          'Show me in 3D what det(A) = 0 looks like when space squishes into a plane!',
-          'What does a negative determinant det(A) < 0 mean for 3D orientation?',
-          'Give me a Candy quiz on Determinants and Invertibility!',
+          'Show me in 3D how State → UI Component → Animation Loop connect!',
+          'Give me a Vibe Coding recipe for turning a boring UI into an Apple-tier interactive experience!',
+          'Give me a Candy quiz on AI UI Prototyping!',
         ],
-        nodeColors: ['#c084fc', '#ec4899', '#38bdf8'],
+        nodeColors: ['#38bdf8', '#f59e0b', '#a855f7'],
         quizQ:
-          'If a 3×3 matrix transformation A has determinant det(A) = 0, what happens geometrically to 3D space?',
+          'When vibe-coding an interactive UI, why should you build and verify a working interactive state skeleton before adding 10 extra features?',
         quizOpts: [
-          'All of 3D space is squished onto a lower-dimensional plane, line, or point of zero volume, making A non-invertible',
-          'Every volume is multiplied by 100',
-          'The matrix becomes a pure rigid rotation',
-          'All vectors keep their original lengths',
+          'Fast visual feedback loops let you feel the UX immediately and catch state bugs while the diff is still small',
+          'Because browsers can only render one button per week',
+          'Because CSS deletes itself after 5 minutes',
+          'So you never have to test the app in a browser',
         ],
         quizCorrect: 0,
         quizExp:
-          'The determinant measures the volume scaling factor. When det(A) = 0, 3D volume collapses to 0 and information is permanently lost.',
+          'Tight visual feedback loops are the heart of Vibe Coding—verify core state and feel first, then layer polish and features!',
       },
       {
-        slug: '03-eigenvectors-and-eigenvalues',
-        title: 'Eigenvectors (A·v = λv) & Invariant Axes in 3D',
+        slug: '03-agentic-debugging-and-context',
+        title: 'Agentic Debugging: Fixing Hallucinations & Context Drift',
         summary:
-          'Discover why almost every vector gets knocked off its span during a transformation—except the eigenvectors.',
-        greeting: `Welcome to **#03-eigenvectors-and-eigenvalues**! 🌟 Look at **Eigenvector v₁ (λ₁=2.4)** and **Eigenvector v₂ (λ₂=0.8)** in the 3D viewer on the right! Notice how ` +
-          '`A·v₁ = λ₁v₁` stretches directly along its own axis without rotating! Want to explore why?',
+          'Learn how to feed exact error stack traces, console logs, and invariants back into your AI coding agent.',
+        greeting: `Welcome to **#03-agentic-debugging-and-context**! 🛠️ Look at the red **Error Trace** loop from **Auto-Debug & Deploy** back into **AI Code Generator** on the right! Every vibe coder hits a bug where the AI loops on the same mistake—want to know the 3-step trick to break out of an AI debugging loop?`,
         prompts: [
-          'Intuitively explain A·v = λv using our 3D eigenvector model!',
-          'How does a 3D rotation axis relate to an eigenvector with λ = 1?',
-          'Challenge me with an Eigenvector Candy quiz!',
+          'Visualize the 3D Self-Healing Debug Loop (Error Trace → Root Cause → Minimal Diff)!',
+          'What should I do when the AI keeps breaking File A while fixing File B?',
+          'Quiz me on Agentic Debugging & Context hygiene!',
+        ],
+        nodeColors: ['#f43f5e', '#a855f7', '#38bdf8'],
+        quizQ:
+          'When an AI coding assistant gets stuck repeating the same broken fix, what is the most effective Vibe Coding move?',
+        quizOpts: [
+          'Paste the exact error trace/state, ask the AI to explain the root cause first without editing, and constrain the fix to specific files',
+          'Type "FIX IT NOW!!!" 20 times in all caps',
+          'Delete the entire git repository without committing',
+          'Ask the AI to rewrite the whole app in a different framework',
+        ],
+        quizCorrect: 0,
+        quizExp:
+          'Forcing root-cause analysis with concrete runtime evidence (stack trace + state values) resets hallucinated assumptions and produces a clean diff.',
+      },
+      {
+        slug: '04-zero-to-deploy-shipping-loop',
+        title: 'Zero-to-One Full-Stack Shipping (Auth, DB, API & Deploy)',
+        summary:
+          'Wire up API routes, schema validation, and one-click deployment without losing your creative flow.',
+        greeting: `Welcome to **#04-zero-to-deploy-shipping-loop**! 🚀 A real vibe coder doesn't stop at localhost:3000—we ship live URLs! Let's trace the full 3D loop from **Frontend Action → Typed API Route → Database → Live Deploy**!`,
+        prompts: [
+          'Show me the 3D Full-Stack Vibe Coding architecture from UI to API & DB!',
+          'What is the 5-minute pre-launch checklist before shipping an AI-built app?',
+          'Launch the +35 Candy Vibe Coding Boss Quiz!',
+        ],
+        nodeColors: ['#34d399', '#a855f7', '#fbbf24'],
+        quizQ:
+          'Before deploying a vibe-coded full-stack app to production, which security check is non-negotiable?',
+        quizOpts: [
+          'Keeping API keys in server-side environment variables and validating/authenticating requests on the server',
+          'Hardcoding secret API keys directly inside public client-side HTML',
+          'Turning off HTTPS so requests feel faster',
+          'Letting any anonymous user run raw SQL DROP TABLE commands',
+        ],
+        quizCorrect: 0,
+        quizExp:
+          'Even when moving at vibe-coding speed, secrets must stay server-side in env vars and API routes must validate inputs and auth!',
+      },
+    ],
+    'dating-coach': [
+      {
+        slug: '01-first-impression-and-approaching',
+        title: 'Warm Confidence, Eye Contact & Natural Conversation Openers',
+        summary:
+          'Overcome approach anxiety and start effortless, zero-pressure conversations using observational openers.',
+        greeting: `Hey! 💕✨ I'm **${mentor.name}** (your **How to Make a Girlfriend** & Social Confidence Coach)! Welcome to **#01-first-impression-and-approaching**! Look at **Warm Eye Contact & Vibe** and **Playful Situational Opener** in our 3D social flow on the right. Most guys freeze up because they think they need a "genius pickup line"—want to see why a simple **Situational Observation** works 10x better?`,
+        prompts: [
+          'Show me in 3D why Situational Openers beat cheesy pickup lines every time!',
+          'Let’s roleplay: I see someone cute at a coffee shop or campus—what do I say first?',
+          'Quiz me on First Impressions, Body Language & Openers!',
+        ],
+        nodeColors: ['#ec4899', '#f472b6', '#fbbf24'],
+        quizQ:
+          'Why does a warm situational opener (commenting lightly on the shared environment or moment) work much better than a memorized pickup line?',
+        quizOpts: [
+          'It feels genuine, low-pressure, and socially calibrated, making it easy for her to respond naturally',
+          'Because memorized pickup lines are legally required to be 500 words long',
+          'Because you should never smile or make eye contact when saying hello',
+          'Because talking like a robot is the best way to build warmth',
+        ],
+        quizCorrect: 0,
+        quizExp:
+          'Situational openers share a real moment in the present environment with zero pressure, signaling social intelligence and relaxed warmth.',
+      },
+      {
+        slug: '02-magnetic-banter-and-active-listening',
+        title: 'Escaping Interview Mode: Playful Banter & Active Listening',
+        summary:
+          'Stop asking boring resume questions ("What’s your major?") and create fun emotional spark.',
+        greeting: `Welcome to **#02-magnetic-banter-and-active-listening**! 💬🔥 Check out **Active Listening & Empathy** in the 3D viewer on the right! Have you ever felt a conversation turn into a dry job interview (*"Where are you from? What do you do? How many siblings?"*)? Let's learn the **Callback + Playful Tease + Open Why** loop in 3D!`,
+        prompts: [
+          'Show me in 3D how to turn "Interview Mode" into playful, magnetic banter!',
+          'Roleplay a 3-turn conversation with me and rate my vibe!',
+          'Give me a Candy quiz on Active Listening & Banter!',
+        ],
+        nodeColors: ['#fbbf24', '#ec4899', '#a855f7'],
+        quizQ:
+          'How do you avoid "Job Interview Mode" when getting to know someone you like?',
+        quizOpts: [
+          'Dive into the feelings/stories behind what she just shared (why she loves it) and mix in light, warm observations before switching topics',
+          'Read 25 rapid-fire yes/no questions off a clipboard without reacting',
+          'Talk only about yourself for 45 minutes straight without pausing',
+          'Stare at your phone while she is speaking',
+        ],
+        quizCorrect: 0,
+        quizExp:
+          'Great chemistry comes from emotional resonance—listening to *why* something excites her, sharing a relatable story, and adding playful warmth!',
+      },
+      {
+        slug: '03-asking-her-out-and-first-date-vibe',
+        title: 'Texting Chemistry, Asking Her Out & First Date Architecture',
+        summary:
+          'When and how to suggest a low-pressure, high-chemistry first date with a clear plan.',
+        greeting: `Welcome to **#03-asking-her-out-and-first-date-vibe**! ☕✨ Look at **Low-Pressure Date Invite** in our 3D graph on the right! Notice the difference between a vague *"We should hang out sometime"* vs. a warm, specific *"Hey, I’m checking out this cozy dessert café on Thursday after 5—come join me for 45 minutes!"* Ready to practice?`,
+        prompts: [
+          'Show me the 3D blueprint of a high-chemistry, low-pressure First Date!',
+          'How do I ask her out over text or in person without making it awkward?',
+          'Quiz me on Texting & First Date planning!',
+        ],
+        nodeColors: ['#34d399', '#ec4899', '#f472b6'],
+        quizQ:
+          'When inviting someone on a first date, what makes the invitation feel confident yet comfortable and low-pressure?',
+        quizOpts: [
+          'Suggesting a specific, casual activity + day/time tied to a shared interest (e.g., coffee, matcha, or an art walk) with an easy vibe',
+          'Saying "Idk, whatever you want whenever in the next 6 months"',
+          'Booking a 6-hour formal banquet with your entire extended family on Date #1',
+          'Sending 18 texts in a row at 3 AM if she hasn’t replied in 5 minutes',
+        ],
+        quizCorrect: 0,
+        quizExp:
+          'A clear, casual plan ("Let’s grab matcha at X on Friday afternoon!") removes decision fatigue while keeping the vibe relaxed and fun.',
+      },
+      {
+        slug: '04-emotional-connection-and-confession',
+        title: 'Deepening Trust, Reading Signals & Becoming a Great Partner',
+        summary:
+          'Build authentic emotional closeness, respect boundaries, and transition naturally into a relationship.',
+        greeting: `Welcome to **#04-emotional-connection-and-confession**! 💖 Attraction starts the spark, but **emotional safety, shared laughter, and genuine kindness** build a real relationship. Let's explore how to read mutual signals and express your feelings sincerely!`,
+        prompts: [
+          'Visualize the 3D stages from First Spark → Mutual Trust → Relationship!',
+          'How do I tell if she likes me as more than a friend—and how do I express my feelings?',
+          'Launch the +35 Candy Dating & Social Confidence Boss Quiz!',
         ],
         nodeColors: ['#a855f7', '#ec4899', '#34d399'],
         quizQ:
-          'What defines an eigenvector v of a linear transformation matrix A?',
+          'What is the healthiest foundation when transitioning from great dates into an official relationship?',
         quizOpts: [
-          'A non-zero vector whose direction stays on the exact same line through the origin after applying A, only scaled by eigenvalue λ',
-          'A vector that is always rotated by 90 degrees',
-          'The zero vector [0, 0, 0] exclusively',
-          'A vector whose coordinates must all be prime integers',
+          'Consistent warmth, mutual effort, clear communication of your feelings, and respecting her pace and boundaries',
+          'Playing toxic mind games and purposely ignoring her for a week',
+          'Pretending to be a completely different person with fake hobbies',
+          'Demanding an answer on the first 5 minutes of meeting',
         ],
         quizCorrect: 0,
         quizExp:
-          'While most vectors get rotated off their span by A, an eigenvector v remains on its own span line and simply stretches or flips by factor λ.',
-      },
-      {
-        slug: '04-svd-and-pca-geometry',
-        title: 'Singular Value Decomposition (SVD) & PCA Variance Axes',
-        summary:
-          'Decompose any matrix into Rotation → Scaling → Rotation (U·Σ·Vᵀ) and find principal 3D axes of data.',
-        greeting: `Welcome to **#04-svd-and-pca-geometry**! 🏆 Did you know that **every** matrix transformation—even non-square ones—can be broken into **Rotate (Vᵀ) → Stretch along perpendicular axes (Σ) → Rotate (U)**? Let's see SVD and PCA in 3D!`,
-        prompts: [
-          'Visualize SVD (U · Σ · Vᵀ) as three geometric steps in 3D!',
-          'How does PCA use eigenvectors of the covariance matrix to reduce dimensions?',
-          'Give me the +35 Candy Linear Algebra Boss Quiz!',
-        ],
-        nodeColors: ['#ec4899', '#a855f7', '#fbbf24'],
-        quizQ:
-          'In Principal Component Analysis (PCA), what does the first principal component axis represent in 3D data space?',
-        quizOpts: [
-          'The orthogonal direction (eigenvector of the covariance matrix) with the largest eigenvalue, capturing maximum variance',
-          'The axis with zero variance and maximum noise',
-          'Always the standard X-axis regardless of the dataset',
-          'A random line that misses the data centroid',
-        ],
-        quizCorrect: 0,
-        quizExp:
-          'PCA aligns coordinates with the eigenvectors of the covariance matrix, where the top eigenvalue λ₁ points along the direction of greatest variance.',
+          'Authentic confidence means being honest about your interest while valuing mutual enthusiasm, kindness, and emotional respect.',
       },
     ],
-    'arch-sensei': [
+    'korea-history': [
       {
-        slug: '01-global-load-balancing-l7',
-        title: 'Global Anycast L7 Load Balancing & Traffic Routing',
+        slug: '01-three-kingdoms-goguryeo-baekje-silla',
+        title: 'Three Kingdoms: Goguryeo, Baekje & Silla along the Han River',
         summary:
-          'Route worldwide HTTP/3 and gRPC requests through edge load balancers to healthy regional backends.',
-        greeting: `Hey team! I'm **${mentor.name}**! ☁️ Welcome to **#01-global-load-balancing-l7**! Check out **Global HTTPS Load Balancer** at the top of our 3D mesh on the right, fanning traffic out to **Cloud Run Pod #1, #2, #3**. What happens if Pod #1 suddenly crashes mid-request?`,
+          'Discover why controlling the Han River basin decided the fate of Goguryeo, Baekje, and Silla in 3D.',
+        greeting: `안녕하세요! 🏛️📜 I'm **${mentor.name}** (Korea History)! Welcome to **#01-three-kingdoms-goguryeo-baekje-silla**! Look at **Goguryeo · Baekje · Silla** in our 3D historical timeline on the right. Here is a thrilling mystery: why did all three kingdoms fight so fiercely to control the **Han River (한강)** basin in the 4th to 6th centuries?`,
         prompts: [
-          'Simulate a Pod failure and Load Balancer health-check failover in 3D!',
-          'What is the difference between L4 (TCP) and L7 (HTTP/gRPC) load balancing?',
-          'Quiz me on Global Anycast Load Balancing!',
+          'Show me a 3D strategic map of Goguryeo, Baekje, and Silla competing for the Han River!',
+          'Compare the cultures of Goguryeo (Gwanggaeto), Baekje, and Silla!',
+          'Quiz me on the Three Kingdoms of Korea!',
         ],
-        nodeColors: ['#60a5fa', '#38bdf8', '#34d399'],
+        nodeColors: ['#f59e0b', '#38bdf8', '#34d399'],
         quizQ:
-          'How does a Global Anycast L7 HTTPS Load Balancer minimize latency for users on different continents?',
+          'Why was the Han River basin (한강 유역) the most decisive strategic prize among Goguryeo, Baekje, and Silla?',
         quizOpts: [
-          'It terminates TLS/HTTP at the nearest edge PoP using a single Anycast IP and routes over fiber backbone to the closest healthy backend',
-          'It forces all global packets through a single home router',
-          'It disables TLS encryption to save CPU cycles',
-          'It drops 50% of requests at random',
+          'It sits at the center of the peninsula with fertile plains and direct Yellow Sea maritime routes to trade and diplomacy with China',
+          'It was covered in active volcanoes that produced laser weapons',
+          'It was the only place where horses were allowed to sleep',
+          'None of the Three Kingdoms ever visited the Han River',
         ],
         quizCorrect: 0,
         quizExp:
-          'Anycast routes users to the physically closest Google edge PoP for fast TLS handshake, then forwards requests over low-latency backbone links.',
+          'Whichever kingdom held the Han River controlled the agricultural heartland, split the other two rivals, and gained direct sea trade across the Yellow Sea (4thC Baekje → 5thC Goguryeo → 6thC Silla)!',
       },
       {
-        slug: '02-cloud-run-k8s-autoscaling',
-        title: 'Cloud Run & Kubernetes HPA Zero-Downtime Autoscaling',
+        slug: '02-goryeo-celadon-and-tripitaka',
+        title: 'Goryeo Dynasty: Trade Port Byeokrando, Celadon & Jikji',
         summary:
-          'Watch burst instances spin up on concurrency spikes while streaming AI & database state.',
-        greeting: `Welcome to **#02-cloud-run-k8s-autoscaling**! 🚀 Look at **Cloud Run Pod #3 (Burst)** in our 3D viewer on the right! When traffic spikes 20x in 5 seconds, how do we scale out containers without dropping active WebSocket/GenAI streams?`,
+          'Explore how "Korea" got its global name, the 80,000 woodblocks of Tripitaka Koreana, and the world’s oldest metal type.',
+        greeting: `Welcome to **#02-goryeo-celadon-and-tripitaka**! 🏺📖 Check out **Goryeo Celadon & Jikji** in the 3D viewer on the right! Did you know the English word **"Korea"** comes directly from **Goryeo (고려)**, and that Goryeo artisans invented movable metal printing type (**Jikji**, 1377) **78 years before Gutenberg**?`,
         prompts: [
-          'Show me Cold Start vs. Min-Instances warm pooling in 3D!',
-          'How does Kubernetes HPA calculate desired replica count under CPU/concurrency spikes?',
-          'Give me a Candy quiz on Serverless & K8s Autoscaling!',
+          'Visualize the 3D printing heritage of Tripitaka Koreana (팔만대장경) and Jikji (직지)!',
+          'How did Arabian merchants at Byeokrando port spread the name "Korea" to the world?',
+          'Give me a Candy quiz on the Goryeo Dynasty!',
         ],
-        nodeColors: ['#38bdf8', '#a855f7', '#fbbf24'],
+        nodeColors: ['#34d399', '#f59e0b', '#a855f7'],
         quizQ:
-          'Why is keeping stateless compute in Cloud Run/Kubernetes Pods essential for rapid horizontal autoscaling?',
+          'What historic milestone makes "Jikji" (직지심체요절, 1377) from the late Goryeo Dynasty famous worldwide?',
         quizOpts: [
-          'Any request can be routed to any newly spun-up instance while durable state lives in external stores like Firestore or Redis',
-          'Stateless pods store all user databases solely on local temp disk',
-          'It prevents more than one container from running at a time',
-          'It requires manual SSH configuration for every new user',
+          'It is the world’s oldest extant book printed with movable metal type, predating Gutenberg’s Bible by 78 years',
+          'It was the first smartphone app created in Kaesong',
+          'It is a painting of a dinosaur from the Jurassic period',
+          'It was written in English by Marco Polo',
         ],
         quizCorrect: 0,
         quizExp:
-          'Decoupling stateless compute pods from durable storage allows the load balancer to distribute traffic across new burst instances immediately.',
+          'Printed at Heungdeoksa Temple in Cheongju in 1377, Jikji is recognized by UNESCO Memory of the World as the oldest surviving movable metal type book.',
       },
       {
-        slug: '03-distributed-cache-stampede',
-        title: 'Distributed Caching, Redis Rings & Cache Stampede Defense',
+        slug: '03-king-sejong-and-hunminjeongeum',
+        title: 'Joseon Renaissance: King Sejong, Hangul & Jang Yeong-sil',
         summary:
-          'Protect databases like Cloud Firestore from thundering-herd cache misses using request coalescing.',
-        greeting: `Welcome to **#03-distributed-cache-stampede**! 🛡️ Imagine a celebrity post expires from cache at the exact millisecond 100,000 users request it—suddenly all pods hammer **Cloud Firestore (NoSQL)** at once! How would you stop a **Cache Stampede**?`,
+          'See how Hunminjeongeum (Hangul) was scientifically modeled on the human vocal organs and cosmic principles in 1443.',
+        greeting: `Welcome to **#03-king-sejong-and-hunminjeongeum**! 👑✨ Look at **Joseon & Hangul (1443)** in our 3D timeline on the right! Before 1443, ordinary people couldn't read or write classical Chinese characters. So **King Sejong** designed **Hunminjeongeum (Hangul)**—where the consonants literally mirror the **3D shape of your tongue and vocal organs**! Want to see how?`,
         prompts: [
-          'Simulate a Cache Stampede (Thundering Herd) and Singleflight defense in 3D!',
-          'Explain Consistent Hashing rings when adding or removing cache nodes in 3D.',
-          'Quiz me on Cache-Aside vs. Write-Through and Stampede protection!',
+          'Show me in 3D how Hangul consonants (ㄱ, ㄴ, ㅁ, ㅅ, ㅇ) model human vocal organs!',
+          'Tell me the story of King Sejong and scientist Jang Yeong-sil’s water clock & celestial globe!',
+          'Quiz me on King Sejong and Hunminjeongeum!',
         ],
-        nodeColors: ['#f43f5e', '#fbbf24', '#60a5fa'],
+        nodeColors: ['#a855f7', '#f59e0b', '#ec4899'],
         quizQ:
-          'Which technique prevents a Cache Stampede (Thundering Herd) when a hot cache key expires under high concurrency?',
+          'What scientific principle did King Sejong use to design the basic consonant letters (ㄱ, ㄴ, ㅁ, ㅅ, ㅇ) of Hunminjeongeum (Hangul)?',
         quizOpts: [
-          'Request coalescing (Singleflight / mutex lock) or probabilistic early expiration so only one worker recomputes the value',
-          'Deleting the entire database whenever a key expires',
-          'Setting TTL to 0 milliseconds on every key',
-          'Opening 10,000 duplicate database connections per user click',
+          'They visually model the physical shape and position of the speech organs (tongue, lips, teeth, throat) when pronouncing each sound',
+          'They were copied randomly from cloud shapes during a thunderstorm',
+          'They represent the recipes for five royal court soups',
+          'They were designed so only 3 nobles in the palace could read them',
         ],
         quizCorrect: 0,
         quizExp:
-          'Singleflight (request coalescing) ensures only one pod fetches from the database on a cache miss while concurrent requests share the result.',
+          'For example, ㄱ (g/k) shows the root of the tongue blocking the throat, ㄴ (n) shows the tongue tip touching the upper gums, and ㅁ (m) shows the shape of the lips!',
       },
       {
-        slug: '04-firestore-raft-consensus',
-        title: 'Multi-Region Replication, Raft Consensus & ACID Transactions',
+        slug: '04-admiral-yi-sun-sin-and-modern-korea',
+        title: 'Admiral Yi Sun-sin’s Geobukseon & The Miracle on the Han River',
         summary:
-          'Understand quorum writes, leader election, and optimistic concurrency control across distributed nodes.',
-        greeting: `Welcome to **#04-firestore-raft-consensus**! 🏆 Ready for Staff-level distributed systems? Let's inspect how **Cloud Firestore** commits state across replicas without split-brain corruption!`,
+          'From Battle of Myeongnyang (13 ships vs 133) and the Independence Movement to modern Korea’s global rise.',
+        greeting: `Welcome to **#04-admiral-yi-sun-sin-and-modern-korea**! 🐢⚓ Look at **Miracle on the Han River** in our 3D canvas on the right! From **Admiral Yi Sun-sin** turning the tide at Myeongnyang with just 13 ships using the whirlpool currents of Uldolmok, to Korea's modern cultural & tech renaissance—which era do you want to explore in 3D?`,
         prompts: [
-          'Visualize Raft Leader Election and Quorum Writes (N=3 or N=5) in 3D!',
-          'Explain CAP Theorem trade-offs during a network partition in 3D.',
-          'Launch the +35 Candy Cloud Architecture Boss Quiz!',
+          'Model Admiral Yi Sun-sin’s Crane Wing Formation (학익진) & Geobukseon in 3D!',
+          'How did Admiral Yi win the Battle of Myeongnyang with 13 ships against 133?',
+          'Launch the +35 Candy Korean History Boss Quiz!',
         ],
-        nodeColors: ['#fbbf24', '#34d399', '#a855f7'],
+        nodeColors: ['#ec4899', '#38bdf8', '#f59e0b'],
         quizQ:
-          'In a 5-node Raft consensus cluster, how many nodes must acknowledge a log entry before the leader can safely commit it?',
+          'At the Battle of Hansando (1592), which naval formation did Admiral Yi Sun-sin use to lure the enemy fleet into open waters and encircle them?',
         quizOpts: [
-          'A majority quorum of at least 3 nodes (⌊N/2⌋ + 1)',
-          'Only 1 node (the client browser)',
-          'All 5 nodes plus 2 external DNS servers',
-          'Zero nodes',
+          'The Crane Wing Formation (학익진, Hagikjin), surrounding the fleet in a U-shaped arc with heavy cannon fire',
+          'Submarine torpedo warfare under the Arctic ice',
+          'Hot air balloon cavalry charges',
+          'Retreating onto Mount Paektu with horses',
         ],
         quizCorrect: 0,
         quizExp:
-          'A majority quorum (3 of 5) guarantees that any future elected leader overlaps in at least one node containing the committed entry.',
-      },
-    ],
-    'bio-mentor': [
-      {
-        slug: '01-alpha-helix-h-bonds',
-        title: 'Polypeptide Backbone & Alpha-Helix Hydrogen Bonds',
-        summary:
-          'Trace peptide bonds from N-Terminus to C-Terminus and see how i → i+3/i+4 hydrogen bonds stabilize helices.',
-        greeting: `Hi there! I'm **${mentor.name}**! 🧬 Welcome to **#01-alpha-helix-h-bonds**! Rotate our 3D molecule on the right—do you see the pink **Peptide Bond** chain from **N-Terminus (Met-1)** to **C-Terminus Domain**, held together by cyan **H-Bond** bridges?`,
-        prompts: [
-          'Explain how Hydrogen Bonds fold a linear amino acid chain into a 3D Alpha Helix!',
-          'Why do hydrophobic residues tuck into the interior core of a protein in water?',
-          'Quiz me on Primary, Secondary, Tertiary, and Quaternary protein structure!',
-        ],
-        nodeColors: ['#fb7185', '#38bdf8', '#f43f5e'],
-        quizQ:
-          'What primary non-covalent interaction stabilizes the helical backbone of an Alpha-Helix in secondary protein structure?',
-        quizOpts: [
-          'Hydrogen bonds between the backbone carbonyl oxygen (C=O) of residue i and the amide hydrogen (N-H) of residue i+3 / i+4',
-          'Metallic bonds between iron atoms in the solvent',
-          'Gravitational attraction between ribosome subunits',
-          'Radioactive decay of peptide bonds',
-        ],
-        quizCorrect: 0,
-        quizExp:
-          'Regular backbone hydrogen bonding between C=O and N-H groups every turn coils the polypeptide chain into a stable alpha-helix.',
-      },
-      {
-        slug: '02-active-site-ligand-docking',
-        title: 'Catalytic Active Site Pocket & ATP Ligand Docking',
-        summary:
-          'Explore induced-fit molecular recognition and cofactor binding inside 3D enzyme pockets.',
-        greeting: `Welcome to **#02-active-site-ligand-docking**! 🔬 Look closely at **Active Site Pocket** and the glowing cyan ring **ATP Ligand Cofactor** in our 3D viewer on the right! How does an enzyme recognize its exact substrate out of thousands of molecules in a cell?`,
-        prompts: [
-          'Visualize Lock-and-Key vs. Induced-Fit enzyme catalysis in 3D!',
-          'How does a single point mutation in the Active Site Pocket affect ligand binding?',
-          'Give me a Candy quiz on Enzyme Kinetics & Ligand Docking!',
-        ],
-        nodeColors: ['#fda4af', '#38bdf8', '#34d399'],
-        quizQ:
-          'How do enzymes accelerate biochemical reactions inside the catalytic active site pocket?',
-        quizOpts: [
-          'By stabilizing the transition state and lowering the activation energy barrier (ΔG‡) through precise 3D side-chain geometry',
-          'By boiling the entire cell to 500°C',
-          'By permanently changing the thermodynamic equilibrium constant of the products',
-          'By destroying ATP without releasing energy',
-        ],
-        quizCorrect: 0,
-        quizExp:
-          'Enzymes orient substrates and stabilize the high-energy transition state, dramatically lowering activation energy without altering overall ΔG.',
-      },
-      {
-        slug: '03-crispr-cas9-dna-cleavage',
-        title: 'CRISPR-Cas9 Guide RNA & Target DNA Cleavage in 3D',
-        summary:
-          'Model how Cas9 scans PAM sequences, unwinds the DNA double helix, and forms an R-loop for precision editing.',
-        greeting: `Welcome to **#03-crispr-cas9-dna-cleavage**! ✂️ Want to see how **CRISPR-Cas9** acts like a 3D molecular GPS + scissors? Before Cas9 even unzips DNA to check the 20-nucleotide guide RNA, it looks for a tiny 3-letter **PAM motif (5'-NGG-3')**!`,
-        prompts: [
-          'Generate a 3D model of CRISPR-Cas9 scanning PAM sites and unwinding DNA!',
-          'Why is the PAM sequence essential so CRISPR doesn’t cut its own bacterial locus?',
-          'Quiz me on CRISPR-Cas9 R-loop formation and gene editing!',
-        ],
-        nodeColors: ['#f472b6', '#a855f7', '#38bdf8'],
-        quizQ:
-          'In CRISPR-Cas9 gene editing, what must Cas9 recognize on the target DNA before unwinding the double helix to match the guide RNA?',
-        quizOpts: [
-          'A short PAM (Protospacer Adjacent Motif, such as 5′-NGG-3′) immediately adjacent to the target site',
-          'The entire chromosome telomere cap',
-          'A lipid bilayer membrane channel',
-          'A ribosome stop codon',
-        ],
-        quizCorrect: 0,
-        quizExp:
-          'Cas9 rapidly scans DNA for PAM sequences first; only upon PAM binding does it melt the local duplex to test guide-RNA complementarity.',
-      },
-      {
-        slug: '04-alphafold-protein-folding',
-        title: 'Levinthal’s Paradox & AI 3D Structure Prediction',
-        summary:
-          'How proteins fold in milliseconds on funnel energy landscapes and how Evoformer attention predicts 3D coordinates.',
-        greeting: `Welcome to **#04-alphafold-protein-folding**! 🏆 If a 100-residue protein tried every random 3D conformation, it would take longer than the age of the universe (**Levinthal's Paradox**)—yet it folds in milliseconds! Let's explore how nature and Bio-AI solve 3D folding!`,
-        prompts: [
-          'Visualize the 3D Folding Energy Funnel and hydrophobic core collapse!',
-          'How does AlphaFold predict 3D Cα coordinates from multiple sequence alignments?',
-          'Launch the +35 Candy Bio-AI Boss Quiz!',
-        ],
-        nodeColors: ['#ec4899', '#38bdf8', '#fbbf24'],
-        quizQ:
-          'How does nature resolve Levinthal’s Paradox so proteins fold in milliseconds instead of billions of years?',
-        quizOpts: [
-          'Cooperative local interactions guide the polypeptide down a funnel-shaped free-energy landscape toward the native minimum',
-          'Each protein tests every possible conformation sequentially at 1 per second',
-          'Proteins remain completely unfolded flat lines inside cells',
-          'DNA manually folds every amino acid using mechanical gears',
-        ],
-        quizCorrect: 0,
-        quizExp:
-          'Rather than a random exhaustive search, hydrophobic collapse and local hydrogen bonds steer folding down a steep thermodynamic energy funnel.',
+          'Admiral Yi feigned retreat to draw the enemy out of narrow straits into open water near Hansando, then deployed the Crane Wing Formation (학익진) to envelop them with long-range Panokseon & Geobukseon cannons!',
       },
     ],
     'astro-guide': [
@@ -1109,54 +1135,102 @@ function buildCurriculumForMentor(mentor: MentorConfig): CurriculumChannel[] {
   });
 }
 
+function getDefaultMaterialTypeForChannel(
+  channelSlug: string,
+  level: StudentLevel
+): LearningMaterialType {
+  if (channelSlug.startsWith('01-')) {
+    return level === 'advanced' ? '3d_preview' : 'image_explanation';
+  }
+  if (channelSlug.startsWith('02-')) {
+    return 'mini_game';
+  }
+  if (channelSlug.startsWith('03-')) {
+    return '3d_preview';
+  }
+  if (channelSlug.startsWith('04-')) {
+    return 'small_test';
+  }
+  return selectOptimalMaterialType(channelSlug, level, 'auto_recommend', 0);
+}
+
 function buildClientFallbackResponse(
   mentor: MentorConfig,
   channelTitle: string,
   userPrompt: string,
-  currentLevel: StudentLevel
+  currentLevel: StudentLevel,
+  mode: MentorRequestMode = 'chat',
+  turnIndex = 0
 ): MentorAgentTurnResponse {
   const nextLevel: StudentLevel =
     currentLevel === 'unassessed' ? 'intermediate' : currentLevel;
   const cleanTopic = userPrompt.slice(0, 42);
+  const recommendedMaterialType = selectOptimalMaterialType(
+    userPrompt,
+    nextLevel,
+    mode,
+    turnIndex
+  );
+  const meta = MATERIAL_TYPE_META[recommendedMaterialType];
+
+  const fallbackScene: Scene3DSpec = {
+    ...mentor.defaultScene3d,
+    title: `${cleanTopic} · Argon 3D`,
+    conceptSummary: `Interactive 3D topology synthesized for "${cleanTopic}".`,
+  };
+
+  const fallbackQuiz: QuizQuestion = {
+    id: `quiz-${Date.now()}`,
+    topic: cleanTopic,
+    difficulty: nextLevel,
+    question: `In the 3D model for "${cleanTopic}", what do the directed packet flows between nodes illustrate?`,
+    options: [
+      'Live state transitions, memory/data transfers, and causal dependencies between layers',
+      'Disconnected components with zero runtime interaction',
+      'Static comments that are stripped at compile time',
+      'Random noise unrelated to system execution',
+    ],
+    correctIndex: 0,
+    explanation:
+      'Each animated packet represents an active transfer of data, pointers, or control signals across the architecture.',
+    candyReward: 25,
+  };
+
+  const learningMaterial = buildAdaptiveLearningMaterial({
+    mentorId: mentor.id,
+    mentorName: mentor.name,
+    roleTitle: mentor.roleTitle,
+    subject: mentor.subject,
+    accentColor: mentor.accentColor,
+    userMessage: userPrompt,
+    assessedLevel: nextLevel,
+    materialType: recommendedMaterialType,
+    learningStepTitle: `${cleanTopic} — ${meta.shortLabel}`,
+    scene3d: fallbackScene,
+    quiz: fallbackQuiz,
+  });
 
   return {
-    replyText: `Great point in **#${channelTitle}**! As **${mentor.name}**, I've updated the **Gemini 4 Argon** 3D model on the right for **"${cleanTopic}"**.\n\n- **Spatial Nodes**: Represent the core functional states in this curriculum step.\n- **Animated Packets**: Show live data/pointer transitions across connected layers.\n\nRotate the 3D scene on the right and try the updated **Candy Quiz** below!`,
+    replyText: `Great point in **#${channelTitle}**! As **${mentor.name}**, I diagnosed your level as **${LEVEL_BADGE_MAP[nextLevel].label}** and built a custom **${meta.label} (${meta.koreanHint})** right inside this chat bubble for **"${cleanTopic}"**.\n\n- **Why this format**: ${learningMaterial.pedagogicalReason}\n- **Interactive Mini-Preview**: Play with the live HTML/JS widget below or switch between **3D Preview · Mini Game · Small Test · Image Explanation** anytime!`,
     avatarState: 'talking',
     assessedLevel: nextLevel,
     levelReason:
-      'Calibrated to Intermediate based on your question inside this curriculum channel.',
-    learningStepTitle: `${cleanTopic} — 3D Breakdown`,
+      'Calibrated to your mastery level based on your question inside this curriculum channel.',
+    learningStepTitle: `${cleanTopic} — ${meta.shortLabel}`,
     keyTakeaways: [
       `Trace how ${mentor.shortTag} components interact across 3D nodes`,
-      'Spot bottlenecks by watching packet density along directed edges',
-      'Solve the curriculum quiz to earn +25 🍬 Candy',
+      `Complete the inline ${meta.shortLabel} mini-preview in chat for +${learningMaterial.candyReward} 🍬`,
+      'Solve the curriculum quiz on the right to earn +25 🍬 Candy',
     ],
-    scene3d: {
-      ...mentor.defaultScene3d,
-      title: `${cleanTopic} · Argon 3D`,
-      conceptSummary: `Interactive 3D topology synthesized for "${cleanTopic}".`,
-    },
-    quiz: {
-      id: `quiz-${Date.now()}`,
-      topic: cleanTopic,
-      difficulty: nextLevel,
-      question: `In the 3D model for "${cleanTopic}", what do the directed packet flows between nodes illustrate?`,
-      options: [
-        'Live state transitions, memory/data transfers, and causal dependencies between layers',
-        'Disconnected components with zero runtime interaction',
-        'Static comments that are stripped at compile time',
-        'Random noise unrelated to system execution',
-      ],
-      correctIndex: 0,
-      explanation:
-        'Each animated packet represents an active transfer of data, pointers, or control signals across the architecture.',
-      candyReward: 25,
-    },
+    recommendedMaterialType,
+    learningMaterial,
+    scene3d: fallbackScene,
+    quiz: fallbackQuiz,
     candyDelta: 10,
     suggestedFollowUps: [
-      'Show me what happens when load spikes 10x in this 3D model!',
-      'Give me a deeper Advanced explanation and quiz!',
-      'How does this connect to the next curriculum channel?',
+      `Make a Mini Game for #${channelTitle}!`,
+      `Show an Image Explanation diagram for "${cleanTopic}"`,
+      `Give me a Small Test challenge on #${channelTitle}!`,
     ],
     modelUsed: 'gemini-4-argon',
   };
@@ -1224,12 +1298,12 @@ export function MentorStudioView({
     [curriculumChannels, activeChannelId]
   );
 
-  // Per-channel independent conversation & 3D lesson state
+  // Per-channel independent conversation & lesson state
   const [threadsByChannel, setThreadsByChannel] = useState<
     Record<string, ChannelThreadState>
   >({});
 
-  // Rive Avatar State
+  // Autonomous Rive Avatar State (strictly driven by conversation & quiz events, never manual)
   const [avatarState, setAvatarState] = useState<RiveAvatarState>('talking');
   const talkTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1247,14 +1321,30 @@ export function MentorStudioView({
     setLevelReason(getDefaultLevelReason(activeMentor, nextLevel));
   }, [activeMentor, profile.mentorLevels]);
 
-  // Chat Input State & Standalone Room Test Bar State
+  // Chat Input State, File Upload State & Learning Materials Collection Hub State
   const [inputPrompt, setInputPrompt] = useState('');
+  const [pendingAttachments, setPendingAttachments] = useState<
+    ChatAttachment[]
+  >([]);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [selectedMaterialMode, setSelectedMaterialMode] =
+    useState<MentorRequestMode>('auto_recommend');
   const [isLoading, setIsLoading] = useState(false);
   const [candyToast, setCandyToast] = useState<string | null>(null);
   const [isMobileChannelsOpen, setIsMobileChannelsOpen] = useState(false);
   const [isMobileLabOpen, setIsMobileLabOpen] = useState(false);
-  const [isRoomTestOpen, setIsRoomTestOpen] =
-    useState<boolean>(standaloneTestMode);
+
+  // Right Sidebar: Learning Materials Collection Hub ("학습 자료 보관함 / 모아보기")
+  const [materialScope, setMaterialScope] = useState<'channel' | 'mentor'>(
+    'channel'
+  );
+  const [materialFilter, setMaterialFilter] = useState<
+    'all' | LearningMaterialType
+  >('all');
+  const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(
+    null
+  );
+
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const triggerTemporaryAvatarState = useCallback(
@@ -1275,11 +1365,29 @@ export function MentorStudioView({
     }, 3200);
   }, []);
 
-  // Ensure every curriculum channel initializes with the Mentor proactively speaking first!
+  // Ensure every curriculum channel initializes with the Mentor proactively speaking first + an inline JS/HTML Mini-Preview!
   useEffect(() => {
     if (!activeChannel) return;
     setThreadsByChannel((prev) => {
       if (prev[activeChannel.id]) return prev;
+      const defaultMatType = getDefaultMaterialTypeForChannel(
+        activeChannel.slug,
+        savedLevel
+      );
+      const initialMaterial = buildAdaptiveLearningMaterial({
+        mentorId: activeMentor.id,
+        mentorName: activeMentor.name,
+        roleTitle: activeMentor.roleTitle,
+        subject: activeMentor.subject,
+        accentColor: activeMentor.accentColor,
+        userMessage: activeChannel.title,
+        assessedLevel: savedLevel,
+        materialType: defaultMatType,
+        learningStepTitle: activeChannel.title,
+        scene3d: activeChannel.scene3d,
+        quiz: activeChannel.quiz,
+      });
+
       const initialMsg: ChatMessage = {
         id: `proactive-${activeChannel.id}`,
         role: 'mentor',
@@ -1291,6 +1399,8 @@ export function MentorStudioView({
         avatarState: 'talking',
         assessedLevel: savedLevel,
         scene3d: activeChannel.scene3d,
+        recommendedMaterialType: defaultMatType,
+        learningMaterial: initialMaterial,
         proactiveBadge: `Proactive Welcome · #${activeChannel.slug}`,
         suggestedFollowUps: activeChannel.starterPrompts,
         modelUsed: 'gemini-4-argon',
@@ -1304,8 +1414,8 @@ export function MentorStudioView({
           learningStepTitle: activeChannel.title,
           keyTakeaways: [
             activeChannel.summary,
-            'Interact with the 3D nodes on the right to inspect spatial flows',
-            'Solve the channel quiz below to earn Candy rewards',
+            '채팅 내 인터랙티브 학습 프리뷰 및 우측 학습 자료 보관함에서 모든 학습 자료를 모아볼 수 있습니다',
+            '파일(📎)을 첨부해 질문하면 멘토가 코스 맥락에 맞춰 분석해 줍니다',
           ],
         },
       };
@@ -1313,12 +1423,30 @@ export function MentorStudioView({
 
     // Mentor speaks proactively whenever you enter a channel
     triggerTemporaryAvatarState('talking', 2600);
-  }, [activeChannel, savedLevel, triggerTemporaryAvatarState]);
+  }, [activeChannel, activeMentor, savedLevel, triggerTemporaryAvatarState]);
 
   const currentThread: ChannelThreadState = useMemo(() => {
     if (threadsByChannel[activeChannel.id]) {
       return threadsByChannel[activeChannel.id];
     }
+    const defaultMatType = getDefaultMaterialTypeForChannel(
+      activeChannel.slug,
+      savedLevel
+    );
+    const initialMaterial = buildAdaptiveLearningMaterial({
+      mentorId: activeMentor.id,
+      mentorName: activeMentor.name,
+      roleTitle: activeMentor.roleTitle,
+      subject: activeMentor.subject,
+      accentColor: activeMentor.accentColor,
+      userMessage: activeChannel.title,
+      assessedLevel: savedLevel,
+      materialType: defaultMatType,
+      learningStepTitle: activeChannel.title,
+      scene3d: activeChannel.scene3d,
+      quiz: activeChannel.quiz,
+    });
+
     return {
       messages: [
         {
@@ -1329,6 +1457,8 @@ export function MentorStudioView({
           avatarState: 'talking',
           assessedLevel: savedLevel,
           scene3d: activeChannel.scene3d,
+          recommendedMaterialType: defaultMatType,
+          learningMaterial: initialMaterial,
           proactiveBadge: `Proactive Welcome · #${activeChannel.slug}`,
           suggestedFollowUps: activeChannel.starterPrompts,
           modelUsed: 'gemini-4-argon',
@@ -1339,7 +1469,105 @@ export function MentorStudioView({
       learningStepTitle: activeChannel.title,
       keyTakeaways: [activeChannel.summary],
     };
-  }, [threadsByChannel, activeChannel, savedLevel]);
+  }, [threadsByChannel, activeChannel, activeMentor, savedLevel]);
+
+  // Collect all Learning Materials for the Right Sidebar Collection Hub ("학습 자료 보관함")
+  const allMentorMaterials = useMemo<CollectedLearningMaterialItem[]>(() => {
+    const items: CollectedLearningMaterialItem[] = [];
+    for (const ch of curriculumChannels) {
+      const thread =
+        ch.id === activeChannel.id ? currentThread : threadsByChannel[ch.id];
+      if (!thread) continue;
+      for (const msg of thread.messages) {
+        if (msg.role === 'mentor' && msg.learningMaterial) {
+          items.push({
+            id: `${ch.id}::${msg.id}`,
+            messageId: msg.id,
+            channelId: ch.id,
+            channelSlug: ch.slug,
+            channelTitle: ch.title,
+            timestamp: msg.timestamp,
+            assessedLevel: msg.assessedLevel || assessedLevel,
+            material: msg.learningMaterial,
+            scene3d: msg.scene3d || thread.scene3d || ch.scene3d,
+            quiz: msg.quiz || thread.quiz || ch.quiz,
+            proactiveBadge: msg.proactiveBadge,
+          });
+        }
+      }
+    }
+    return items.reverse();
+  }, [
+    curriculumChannels,
+    activeChannel.id,
+    currentThread,
+    threadsByChannel,
+    assessedLevel,
+  ]);
+
+  const scopedMaterials = useMemo(() => {
+    if (materialScope === 'channel') {
+      return allMentorMaterials.filter(
+        (item) => item.channelId === activeChannel.id
+      );
+    }
+    return allMentorMaterials;
+  }, [allMentorMaterials, materialScope, activeChannel.id]);
+
+  const filteredMaterials = useMemo(() => {
+    if (materialFilter === 'all') return scopedMaterials;
+    return scopedMaterials.filter(
+      (item) => item.material.type === materialFilter
+    );
+  }, [scopedMaterials, materialFilter]);
+
+  const activeCollectedMaterial = useMemo<CollectedLearningMaterialItem | null>(() => {
+    if (filteredMaterials.length === 0) return null;
+    if (selectedMaterialId) {
+      const found = filteredMaterials.find(
+        (m) =>
+          m.id === selectedMaterialId || m.messageId === selectedMaterialId
+      );
+      if (found) return found;
+    }
+    return filteredMaterials[0];
+  }, [filteredMaterials, selectedMaterialId]);
+
+  // Collect user-uploaded files in the active scope so the user can view their uploaded study files in the hub
+  const uploadedFilesInScope = useMemo(() => {
+    const list: Array<{
+      attachment: ChatAttachment;
+      channelSlug: string;
+      timestamp: string;
+      messageText: string;
+    }> = [];
+    const targetChannels =
+      materialScope === 'channel' ? [activeChannel] : curriculumChannels;
+    for (const ch of targetChannels) {
+      const thread =
+        ch.id === activeChannel.id ? currentThread : threadsByChannel[ch.id];
+      if (!thread) continue;
+      for (const msg of thread.messages) {
+        if (msg.attachments && msg.attachments.length > 0) {
+          for (const att of msg.attachments) {
+            list.push({
+              attachment: att,
+              channelSlug: ch.slug,
+              timestamp: msg.timestamp,
+              messageText: msg.text,
+            });
+          }
+        }
+      }
+    }
+    return list.reverse();
+  }, [
+    materialScope,
+    activeChannel,
+    curriculumChannels,
+    currentThread,
+    threadsByChannel,
+  ]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -1350,6 +1578,7 @@ export function MentorStudioView({
     setActiveMentor(nextMentor);
     const nextChannels = buildCurriculumForMentor(nextMentor);
     setActiveChannelId(nextChannels[0].id);
+    setSelectedMaterialId(null);
     const nextSavedLevel =
       profile.mentorLevels?.[nextMentor.id] || 'unassessed';
     setAssessedLevel(nextSavedLevel);
@@ -1358,10 +1587,9 @@ export function MentorStudioView({
 
     // Sync browser URL without full page reload so the URL matches the selected mentor
     if (typeof window !== 'undefined') {
-      const targetUrl =
-        standaloneTestMode || window.location.pathname.startsWith('/room')
-          ? `/room?mentor=${nextMentor.id}`
-          : `/mentor/${nextMentor.id}`;
+      const targetUrl = window.location.pathname.startsWith('/room')
+        ? `/room?mentor=${nextMentor.id}`
+        : `/mentor/${nextMentor.id}`;
       window.history.replaceState(null, '', targetUrl);
     }
   };
@@ -1369,6 +1597,7 @@ export function MentorStudioView({
   // Switch Curriculum Channel in the Slack Channels Sidebar
   const handleSelectChannel = (ch: CurriculumChannel) => {
     setActiveChannelId(ch.id);
+    setSelectedMaterialId(null);
     setIsMobileChannelsOpen(false);
     triggerTemporaryAvatarState('talking', 2400);
   };
@@ -1391,21 +1620,21 @@ export function MentorStudioView({
       slug: fullSlug,
       title: raw,
       summary: `Custom curriculum channel for ${raw} with ${activeMentor.name}.`,
-      proactiveGreeting: `Welcome to your new curriculum channel **#${fullSlug}**! 🎉 I'm **${activeMentor.name}**, and I'll lead this session on **${raw}**. Let's kick off: what's the #1 thing about **${raw}** you want to see modeled in 3D right now?`,
+      proactiveGreeting: `Welcome to your new curriculum channel **#${fullSlug}**! 🎉 I'm **${activeMentor.name}**, and I'll lead this session on **${raw}**. Let's kick off: what's the #1 thing about **${raw}** you want to see modeled in 3D or as an interactive Mini-Preview right now?`,
       proactiveNudges: {
-        pointOut3D: `🔍 **3D Observation (#${fullSlug})**: Look at how the 3D nodes on the right model **${raw}**. Which component do you think is the most critical bottleneck?`,
+        pointOut3D: `🔍 **3D Observation (#${fullSlug})**: Look at how the 3D nodes model **${raw}**. Which component do you think is the most critical bottleneck?`,
         socraticQuestion: `🎯 **Socratic Check (+10 🍬)**: In your own words, what problem does **${raw}** solve? Answer in one line and I'll calibrate the 3D scene to your level!`,
         realWorldTip: `💡 **${activeMentor.name}'s Course Tip**: The fastest way to master **${raw}** is to trace how state flows from input to output in 3D. Want me to generate a custom 3D breakdown?`,
         followUpChips: [
           `Build a 3D model of the core architecture of ${raw}`,
-          `Explain ${raw} from first principles and diagnose my level`,
-          `Give me a Candy quiz on ${raw}!`,
+          `Make a Mini Game to practice ${raw}`,
+          `Give me a Small Test on ${raw}!`,
         ],
       },
       starterPrompts: [
         `Build a 3D model of the core architecture of ${raw}`,
-        `Explain ${raw} from first principles and diagnose my level`,
-        `Give me a Candy quiz on ${raw}!`,
+        `Make a Mini Game to practice ${raw}`,
+        `Give me a Small Test on ${raw}!`,
       ],
       scene3d: {
         ...activeMentor.defaultScene3d,
@@ -1438,6 +1667,57 @@ export function MentorStudioView({
     setIsAddingChannel(false);
   };
 
+  // Handle File Selection (Priority 1: File Upload; Voice/Image/Video remembered as next priority)
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files;
+    if (!fileList || fileList.length === 0) return;
+
+    const textExtensions =
+      /\.(txt|md|markdown|json|csv|tsv|js|jsx|ts|tsx|py|java|c|cpp|h|hpp|cs|go|rs|rb|php|html|htm|css|scss|sql|yaml|yml|xml|sh|bash|zsh|env|ini|toml|log|tex|r|jl|swift|kt|scala)$/i;
+
+    const newlyRead: ChatAttachment[] = [];
+    for (const file of Array.from(fileList)) {
+      let textContent: string | undefined;
+      const isTextLike =
+        file.type.startsWith('text/') ||
+        file.type === 'application/json' ||
+        file.type === 'application/xml' ||
+        file.type === 'application/javascript' ||
+        textExtensions.test(file.name);
+
+      if (isTextLike && file.size <= 512 * 1024) {
+        try {
+          const rawText = await file.text();
+          textContent = rawText.slice(0, 6000);
+        } catch {
+          textContent = undefined;
+        }
+      }
+
+      newlyRead.push({
+        id: `file-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        kind: 'file',
+        name: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        sizeBytes: file.size,
+        textContent,
+      });
+    }
+
+    setPendingAttachments((prev) => [...prev, ...newlyRead]);
+    showCandyNotification(
+      `📎 파일 ${newlyRead.length}개 첨부됨: ${newlyRead.map((f) => f.name).join(', ')}`
+    );
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleRemovePendingAttachment = (id: string) => {
+    setPendingAttachments((prev) => prev.filter((item) => item.id !== id));
+  };
+
   // Course-Driven Proactive Mentor Nudge ("내가 배우고 있는 코스에 따른 Proactive 메시지")
   const handleMentorSpeakFirst = (preferredType?: ProactiveNudgeType) => {
     if (isLoading) return;
@@ -1458,29 +1738,48 @@ export function MentorStudioView({
     let text = '';
     let badge = '';
     let targetEmotion: RiveAvatarState = 'talking';
+    let matType: LearningMaterialType = '3d_preview';
 
     if (selectedType === '3d_pointout') {
       text =
         activeChannel.proactiveNudges.pointOut3D ||
-        `🔍 **3D Observation (#${activeChannel.slug})**: Look at **${primaryNodeLabel}** and **${secondaryNodeLabel}** in the 3D viewer on the right. Notice how the animated packets flow between them—what happens if **${primaryNodeLabel}** gets overloaded?`;
+        `🔍 **3D Observation (#${activeChannel.slug})**: Look at **${primaryNodeLabel}** and **${secondaryNodeLabel}** in the 3D model. Notice how the animated packets flow between them—what happens if **${primaryNodeLabel}** gets overloaded?`;
       badge = `🔍 3D Point-Out · #${activeChannel.slug}`;
       targetEmotion = 'talking';
+      matType = '3d_preview';
     } else if (selectedType === 'socratic_quiz') {
       text =
         activeChannel.proactiveNudges.socraticQuestion ||
-        `🎯 **Socratic Check (+10 🍬)**: In **${activeChannel.title}**, why does **${primaryNodeLabel}** connect directly to **${secondaryNodeLabel}**? Share your intuition in one sentence!`;
+        `🎯 **Socratic Check (+10 🍬)**: In **${activeChannel.title}**, why does **${primaryNodeLabel}** connect directly to **${secondaryNodeLabel}**? Try the interactive Small Test preview below!`;
       badge = `🎯 Socratic Check · ${LEVEL_BADGE_MAP[assessedLevel].label}`;
       targetEmotion = 'thinking';
+      matType = 'small_test';
     } else {
       text =
         activeChannel.proactiveNudges.realWorldTip ||
-        `💡 **${activeMentor.name}'s Course Tip**: While studying **#${activeChannel.slug}**, try rotating the 3D scene and clicking **${primaryNodeLabel}** to inspect its tooltip! Want me to simulate a real-world failure case in 3D?`;
+        `💡 **${activeMentor.name}'s Course Tip**: While studying **#${activeChannel.slug}**, try routing packets in the interactive Mini Game below to see how **${primaryNodeLabel}** behaves under load!`;
       badge = `💡 Course Insight · #${activeChannel.slug}`;
       targetEmotion = 'happy';
+      matType = 'mini_game';
     }
 
+    const nudgeMaterial = buildAdaptiveLearningMaterial({
+      mentorId: activeMentor.id,
+      mentorName: activeMentor.name,
+      roleTitle: activeMentor.roleTitle,
+      subject: activeMentor.subject,
+      accentColor: activeMentor.accentColor,
+      userMessage: text,
+      assessedLevel,
+      materialType: matType,
+      learningStepTitle: activeChannel.title,
+      scene3d: currentThread.scene3d || activeChannel.scene3d,
+      quiz: currentThread.quiz || activeChannel.quiz,
+    });
+
+    const nudgeMsgId = `nudge-${Date.now()}`;
     const nudgeMsg: ChatMessage = {
-      id: `nudge-${Date.now()}`,
+      id: nudgeMsgId,
       role: 'mentor',
       text,
       timestamp: new Date().toLocaleTimeString('en-US', {
@@ -1489,6 +1788,8 @@ export function MentorStudioView({
       }),
       avatarState: targetEmotion,
       assessedLevel,
+      recommendedMaterialType: matType,
+      learningMaterial: nudgeMaterial,
       proactiveBadge: badge,
       suggestedFollowUps: activeChannel.proactiveNudges.followUpChips,
       modelUsed: 'gemini-4-argon',
@@ -1501,19 +1802,28 @@ export function MentorStudioView({
         messages: [...currentThread.messages, nudgeMsg],
       },
     }));
-    triggerTemporaryAvatarState('talking', 3000);
+    setSelectedMaterialId(`${activeChannel.id}::${nudgeMsgId}`);
+    triggerTemporaryAvatarState(targetEmotion, 3000);
   };
 
-  // Send message / run autonomous mentor turn inside the active Curriculum Channel
+  // Send message (with optional attached files) inside the active Curriculum Channel
   const handleSendMessage = async (
     overridePrompt?: string,
-    mode: 'chat' | 'generate_3d' | 'generate_quiz' = 'chat'
+    mode: MentorRequestMode = selectedMaterialMode
   ) => {
-    const promptText = (overridePrompt ?? inputPrompt).trim();
-    if (!promptText || isLoading) return;
+    const isUsingComposer = overridePrompt === undefined;
+    const attachmentsToSend = isUsingComposer ? pendingAttachments : [];
+    const rawPrompt = (overridePrompt ?? inputPrompt).trim();
 
-    if (!overridePrompt) {
+    if ((!rawPrompt && attachmentsToSend.length === 0) || isLoading) return;
+
+    const promptText =
+      rawPrompt ||
+      `첨부한 학습 파일(${attachmentsToSend.map((a) => a.name).join(', ')})을 #${activeChannel.slug} (${activeChannel.title}) 코스 맥락에서 분석하고 핵심 학습 자료를 만들어 주세요.`;
+
+    if (isUsingComposer) {
       setInputPrompt('');
+      setPendingAttachments([]);
     }
 
     const userMsg: ChatMessage = {
@@ -1524,6 +1834,8 @@ export function MentorStudioView({
         hour: '2-digit',
         minute: '2-digit',
       }),
+      attachments:
+        attachmentsToSend.length > 0 ? attachmentsToSend : undefined,
     };
 
     const updatedMessages = [...currentThread.messages, userMsg];
@@ -1551,6 +1863,7 @@ export function MentorStudioView({
           subject: `${activeMentor.subject} (Curriculum Channel: #${activeChannel.slug} - ${activeChannel.title})`,
           systemPersona: activeMentor.systemPersona,
           userMessage: promptText,
+          attachments: attachmentsToSend,
           currentLevel: assessedLevel,
           history: updatedMessages.slice(-6).map((m) => ({
             role: m.role,
@@ -1568,7 +1881,9 @@ export function MentorStudioView({
           activeMentor,
           activeChannel.slug,
           promptText,
-          assessedLevel
+          assessedLevel,
+          mode,
+          updatedMessages.length
         );
       }
 
@@ -1580,10 +1895,13 @@ export function MentorStudioView({
         setLevelReason(data.levelReason);
       }
 
-      const participationCandy = data.candyDelta || 10;
+      const participationCandy =
+        (data.candyDelta || 10) + (attachmentsToSend.length > 0 ? 5 : 0);
       addCandy(participationCandy);
       showCandyNotification(
-        `+${participationCandy} 🍬 Candy for active learning in #${activeChannel.slug}!`
+        attachmentsToSend.length > 0
+          ? `+${participationCandy} 🍬 파일 기반 질문 & 학습 자료 생성 완료!`
+          : `+${participationCandy} 🍬 Candy for active learning in #${activeChannel.slug}!`
       );
 
       const nextScene = data.scene3d?.nodes?.length
@@ -1593,8 +1911,37 @@ export function MentorStudioView({
         ? data.quiz
         : currentThread.quiz;
 
+      const resolvedMaterialType: LearningMaterialType =
+        data.recommendedMaterialType ||
+        data.learningMaterial?.type ||
+        selectOptimalMaterialType(
+          promptText,
+          data.assessedLevel || assessedLevel,
+          mode,
+          updatedMessages.length
+        );
+
+      const resolvedMaterial =
+        data.learningMaterial && data.learningMaterial.interactiveHtmlCode
+          ? data.learningMaterial
+          : buildAdaptiveLearningMaterial({
+              mentorId: activeMentor.id,
+              mentorName: activeMentor.name,
+              roleTitle: activeMentor.roleTitle,
+              subject: activeMentor.subject,
+              accentColor: activeMentor.accentColor,
+              userMessage: promptText,
+              assessedLevel: data.assessedLevel || assessedLevel,
+              materialType: resolvedMaterialType,
+              learningStepTitle:
+                data.learningStepTitle || currentThread.learningStepTitle,
+              scene3d: nextScene,
+              quiz: nextQuiz || activeChannel.quiz,
+            });
+
+      const mentorMsgId = `mentor-${Date.now()}`;
       const mentorMsg: ChatMessage = {
-        id: `mentor-${Date.now()}`,
+        id: mentorMsgId,
         role: 'mentor',
         text: data.replyText,
         timestamp: new Date().toLocaleTimeString('en-US', {
@@ -1605,6 +1952,8 @@ export function MentorStudioView({
         assessedLevel: data.assessedLevel,
         scene3d: nextScene,
         quiz: nextQuiz || undefined,
+        recommendedMaterialType: resolvedMaterialType,
+        learningMaterial: resolvedMaterial,
         candyEarned: participationCandy,
         suggestedFollowUps: data.suggestedFollowUps,
         modelUsed: data.modelUsed || 'gemini-4-argon',
@@ -1625,20 +1974,24 @@ export function MentorStudioView({
         },
       }));
 
+      setSelectedMaterialId(`${activeChannel.id}::${mentorMsgId}`);
       triggerTemporaryAvatarState(data.avatarState || 'talking', 3600);
     } catch {
       const fallback = buildClientFallbackResponse(
         activeMentor,
         activeChannel.slug,
         promptText,
-        assessedLevel
+        assessedLevel,
+        mode,
+        updatedMessages.length
       );
       setAssessedLevel(fallback.assessedLevel);
       updateMentorLevel(activeMentor.id, fallback.assessedLevel);
       addCandy(10);
 
+      const fallbackMsgId = `mentor-fb-${Date.now()}`;
       const fallbackMsg: ChatMessage = {
-        id: `mentor-fb-${Date.now()}`,
+        id: fallbackMsgId,
         role: 'mentor',
         text: fallback.replyText,
         timestamp: new Date().toLocaleTimeString('en-US', {
@@ -1649,6 +2002,8 @@ export function MentorStudioView({
         assessedLevel: fallback.assessedLevel,
         scene3d: fallback.scene3d,
         quiz: fallback.quiz,
+        recommendedMaterialType: fallback.recommendedMaterialType,
+        learningMaterial: fallback.learningMaterial,
         candyEarned: 10,
         suggestedFollowUps: fallback.suggestedFollowUps,
         modelUsed: 'gemini-4-argon',
@@ -1666,6 +2021,7 @@ export function MentorStudioView({
         },
       }));
 
+      setSelectedMaterialId(`${activeChannel.id}::${fallbackMsgId}`);
       triggerTemporaryAvatarState('talking', 3200);
     } finally {
       setIsLoading(false);
@@ -1715,7 +2071,7 @@ export function MentorStudioView({
       const celebrationMsg: ChatMessage = {
         id: `proactive-quiz-win-${Date.now()}`,
         role: 'mentor',
-        text: `🎉 **Awesome job on the #${activeChannel.slug} quiz!** You just earned **+${candyEarned} 🍬 Candy**!\n\nNotice how that exact principle plays out around **${firstNode}** in our 3D viewer on the right. Want to push this topic to an **Advanced 3D simulation**, or are you ready to jump into **#${nextChannel.slug}** next?`,
+        text: `🎉 **Awesome job on the #${activeChannel.slug} quiz!** You just earned **+${candyEarned} 🍬 Candy**!\n\nNotice how that exact principle plays out around **${firstNode}** in our 3D model. Want to push this topic to an **Advanced 3D simulation**, or are you ready to jump into **#${nextChannel.slug}** next?`,
         timestamp: new Date().toLocaleTimeString('en-US', {
           hour: '2-digit',
           minute: '2-digit',
@@ -1745,7 +2101,7 @@ export function MentorStudioView({
       const hintMsg: ChatMessage = {
         id: `proactive-quiz-hint-${Date.now()}`,
         role: 'mentor',
-        text: `Almost there! 💡 **Quick #${activeChannel.slug} Hint from ${activeMentor.name}**: Take a look at **${firstNode}** in the 3D viewer on the right and watch the direction of the animated packets. Want me to break down the quiz concept with a simpler 3D analogy?`,
+        text: `Almost there! 💡 **Quick #${activeChannel.slug} Hint from ${activeMentor.name}**: Take a look at **${firstNode}** in the 3D model and watch the direction of the animated packets. Want me to break down the quiz concept with a simpler 3D analogy?`,
         timestamp: new Date().toLocaleTimeString('en-US', {
           hour: '2-digit',
           minute: '2-digit',
@@ -1770,59 +2126,211 @@ export function MentorStudioView({
     }
   };
 
-  // Room Test Helper: Simulate Student Level change to test Profile Calibration + Level-adaptive Proactive Messages
-  const handleSimulateStudentLevel = (targetLevel: StudentLevel) => {
-    setAssessedLevel(targetLevel);
-    updateMentorLevel(activeMentor.id, targetLevel);
-    setLevelReason(
-      targetLevel === 'unassessed'
-        ? `${activeMentor.name} (${activeMentor.roleTitle}) diagnoses your ${activeMentor.shortTag} mastery from your questions.`
-        : `[Room Test Override] ${activeMentor.name} calibrated #${activeChannel.slug} to ${LEVEL_BADGE_MAP[targetLevel].label} depth.`
-    );
-    showCandyNotification(
-      `🧪 Level set to ${LEVEL_BADGE_MAP[targetLevel].label} for ${activeMentor.name}`
-    );
-  };
+  const [isRoomTestOpen, setIsRoomTestOpen] = useState<boolean>(standaloneTestMode);
 
-  // Room Test Helper: Reset current course thread to fresh Proactive Welcome state
-  const handleResetActiveCourseThread = () => {
-    const initialMsg: ChatMessage = {
-      id: `proactive-reset-${activeChannel.id}-${Date.now()}`,
-      role: 'mentor',
-      text: activeChannel.proactiveGreeting,
-      timestamp: new Date().toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
-      avatarState: 'talking',
-      assessedLevel,
-      scene3d: activeChannel.scene3d,
-      proactiveBadge: `Proactive Welcome · #${activeChannel.slug}`,
-      suggestedFollowUps: activeChannel.starterPrompts,
-      modelUsed: 'gemini-4-argon',
-    };
+  const handleResetActiveCourseThread = useCallback(() => {
+    setThreadsByChannel((prev) => {
+      const next = { ...prev };
+      delete next[activeChannel.id];
+      return next;
+    });
+    triggerTemporaryAvatarState('talking', 2200);
+  }, [activeChannel.id, triggerTemporaryAvatarState]);
 
-    setThreadsByChannel((prev) => ({
-      ...prev,
-      [activeChannel.id]: {
-        messages: [initialMsg],
-        scene3d: activeChannel.scene3d,
-        quiz: activeChannel.quiz,
-        learningStepTitle: activeChannel.title,
-        keyTakeaways: [
-          activeChannel.summary,
-          'Interact with the 3D nodes on the right to inspect spatial flows',
-          'Solve the channel quiz below to earn Candy rewards',
-        ],
-      },
-    }));
-    triggerTemporaryAvatarState('talking', 2400);
-    showCandyNotification(`🔄 Reset #${activeChannel.slug} thread`);
-  };
+  const handleSimulateStudentLevel = useCallback(
+    (lvl: StudentLevel) => {
+      setAssessedLevel(lvl);
+      setLevelReason(getDefaultLevelReason(activeMentor, lvl));
+      updateMentorLevel(activeMentor.id, lvl);
+    },
+    [activeMentor, updateMentorLevel]
+  );
 
   const activeCustomRivUrl =
     customRivFiles[activeMentor.id] || customRivFiles['global'] || null;
   const currentLevelBadge = LEVEL_BADGE_MAP[assessedLevel];
+
+  // =========================================================================
+  // Cross-Mentor AI Proactive Top Notification Banner (타 멘토 AI 상단 알림)
+  // =========================================================================
+  const [crossMentorNudge, setCrossMentorNudge] =
+    useState<CrossMentorNudgeResponse | null>(null);
+  const [isCrossNudgeLoading, setIsCrossNudgeLoading] = useState(false);
+  const [isCrossNudgeVisible, setIsCrossNudgeVisible] = useState(false);
+  const nudgeCycleIndexRef = useRef<number>(0);
+
+  const triggerCrossMentorNotification = useCallback(
+    async (explicitFromMentorId?: string) => {
+      const priorityIds = [
+        'basic-spanish',
+        'vibe-coding',
+        'dating-coach',
+        'korea-history',
+        'cs-professor',
+      ].filter((id) => id !== activeMentor.id);
+
+      const chosenFromId =
+        explicitFromMentorId && explicitFromMentorId !== activeMentor.id
+          ? explicitFromMentorId
+          : priorityIds[nudgeCycleIndexRef.current % priorityIds.length];
+
+      nudgeCycleIndexRef.current += 1;
+      setIsCrossNudgeLoading(true);
+
+      try {
+        const res = await fetch('/api/mentor/proactive-nudge', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            currentMentorId: activeMentor.id,
+            currentMentorName: activeMentor.name,
+            currentChannelSlug: activeChannel?.slug,
+            studentLevel: assessedLevel,
+            preferredFromMentorId: chosenFromId,
+          }),
+        });
+        if (res.ok) {
+          const data = (await res.json()) as CrossMentorNudgeResponse;
+          setCrossMentorNudge(data);
+          setIsCrossNudgeVisible(true);
+        }
+      } catch {
+        // Silent fallback if network fails
+      } finally {
+        setIsCrossNudgeLoading(false);
+      }
+    },
+    [activeMentor.id, activeMentor.name, activeChannel?.slug, assessedLevel]
+  );
+
+  // Auto-trigger Cross-Mentor AI Top Notification when entering the Demo / switching mentor room
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      triggerCrossMentorNotification();
+    }, 900);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeMentor.id]);
+
+  // Accept the Cross-Mentor Top Notification: switch to that mentor & channel and open the promised 3D preview or mini-game!
+  const handleAcceptCrossMentorNudge = useCallback(() => {
+    if (!crossMentorNudge) return;
+    const targetMentor =
+      workspaceMentors.find((m) => m.id === crossMentorNudge.fromMentorId) ||
+      MENTORS.find((m) => m.id === crossMentorNudge.fromMentorId);
+    if (!targetMentor) return;
+
+    const targetChannels = buildCurriculumForMentor(targetMentor);
+    const matchedChannel =
+      targetChannels.find(
+        (c) => c.slug === crossMentorNudge.targetChannelSlug
+      ) ||
+      targetChannels[1] ||
+      targetChannels[0];
+
+    const targetLevel =
+      profile.mentorLevels?.[targetMentor.id] || 'beginner';
+
+    const customMaterial = buildAdaptiveLearningMaterial({
+      mentorId: targetMentor.id,
+      mentorName: targetMentor.name,
+      roleTitle: targetMentor.roleTitle,
+      subject: targetMentor.subject,
+      accentColor: targetMentor.accentColor,
+      userMessage: `${crossMentorNudge.previousStruggleConcept} — ${crossMentorNudge.notificationText}`,
+      assessedLevel: targetLevel,
+      materialType: crossMentorNudge.promisedMaterialType,
+      learningStepTitle: `${crossMentorNudge.previousStruggleConcept} (${
+        crossMentorNudge.promisedMaterialType === '3d_preview'
+          ? '맞춤 3D Preview'
+          : '맞춤 인터랙티브 미니게임'
+      })`,
+      scene3d: matchedChannel.scene3d,
+      quiz: matchedChannel.quiz,
+    });
+
+    const welcomeMsgId = `cross-nudge-welcome-${Date.now()}`;
+    const welcomeMsg: ChatMessage = {
+      id: welcomeMsgId,
+      role: 'mentor',
+      text: `🙌 **와줘서 고마워! (${targetMentor.name} · ${targetMentor.shortTag})**\n\n${crossMentorNudge.notificationText}\n\n👇 아래에 너를 위해 새로 준비한 **${
+        crossMentorNudge.promisedMaterialType === '3d_preview'
+          ? '인터랙티브 3D Preview'
+          : '맞춤 미니게임 (Mini Game)'
+      }** (**${crossMentorNudge.previousStruggleConcept}**)을 바로 띄워뒀어! 직접 조작해보면서 이어서 공부해 보자!`,
+      timestamp: new Date().toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+      avatarState: 'happy',
+      assessedLevel: targetLevel,
+      scene3d: matchedChannel.scene3d,
+      quiz: matchedChannel.quiz,
+      recommendedMaterialType: crossMentorNudge.promisedMaterialType,
+      learningMaterial: customMaterial,
+      candyEarned: 15,
+      proactiveBadge: `🔔 상단 알림 초청 수락 · 맞춤 ${
+        crossMentorNudge.promisedMaterialType === '3d_preview'
+          ? '3D Preview'
+          : 'Mini Game'
+      }`,
+      suggestedFollowUps: matchedChannel.starterPrompts,
+      modelUsed: crossMentorNudge.modelUsed || 'gemini-3-flash-preview',
+    };
+
+    setIsCrossNudgeVisible(false);
+    setActiveMentor(targetMentor);
+    setActiveChannelId(matchedChannel.id);
+    setAssessedLevel(targetLevel);
+    setLevelReason(getDefaultLevelReason(targetMentor, targetLevel));
+
+    setThreadsByChannel((prev) => {
+      const existing = prev[matchedChannel.id];
+      const baseMessages = existing ? existing.messages : [];
+      return {
+        ...prev,
+        [matchedChannel.id]: {
+          messages: [...baseMessages, welcomeMsg],
+          scene3d: matchedChannel.scene3d,
+          quiz: matchedChannel.quiz,
+          learningStepTitle: matchedChannel.title,
+          keyTakeaways: [
+            matchedChannel.summary,
+            `지난번 헷갈렸던 "${crossMentorNudge.previousStruggleConcept}" 맞춤 ${
+              crossMentorNudge.promisedMaterialType === '3d_preview'
+                ? '3D Preview'
+                : '미니게임'
+            } 생성 완료`,
+          ],
+        },
+      };
+    });
+
+    setSelectedMaterialId(`${matchedChannel.id}::${welcomeMsgId}`);
+    addCandy(15);
+    showCandyNotification(
+      `+15 🍬 ${targetMentor.name} 멘토의 맞춤 ${
+        crossMentorNudge.promisedMaterialType === '3d_preview'
+          ? '3D Preview'
+          : '게임'
+      } 세션으로 이동했습니다!`
+    );
+    triggerTemporaryAvatarState('happy', 3500);
+
+    if (typeof window !== 'undefined') {
+      const targetUrl = window.location.pathname.startsWith('/room')
+        ? `/room?mentor=${targetMentor.id}`
+        : `/mentor/${targetMentor.id}`;
+      window.history.replaceState(null, '', targetUrl);
+    }
+  }, [
+    crossMentorNudge,
+    workspaceMentors,
+    profile.mentorLevels,
+    addCandy,
+    showCandyNotification,
+    triggerTemporaryAvatarState,
+  ]);
 
   return (
     <div className="relative h-[calc(100vh-3.5rem)] w-full overflow-hidden bg-[#0b0e17] text-slate-100 flex">
@@ -2166,37 +2674,6 @@ export function MentorStudioView({
             </ul>
           </div>
         </div>
-
-        {/* Bottom Rive State Controller */}
-        <div className="p-3 border-t border-white/[0.08] bg-slate-950/50">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Mentor .riv Emotion
-            </span>
-            <span className="text-[10px] font-mono text-sky-300">
-              {avatarState}
-            </span>
-          </div>
-          <div className="grid grid-cols-5 gap-1">
-            {RIVE_STATES.map((item) => {
-              const active = avatarState === item.state;
-              return (
-                <button
-                  key={item.state}
-                  type="button"
-                  onClick={() => setAvatarState(item.state)}
-                  className={`py-1 rounded-lg text-[10px] font-bold capitalize border transition cursor-pointer ${
-                    active
-                      ? 'bg-white text-slate-950 border-white'
-                      : 'bg-white/5 text-slate-400 border-white/10 hover:text-white'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
       </aside>
 
       {/* =====================================================================
@@ -2285,176 +2762,159 @@ export function MentorStudioView({
               <span>Speak</span>
             </button>
 
-            {/* Mobile/Tablet Toggle for 3D Argon & Quiz Drawer */}
+            {/* Trigger / Cycle Cross-Mentor AI Top Notification Banner */}
+            <button
+              type="button"
+              onClick={() => triggerCrossMentorNotification()}
+              disabled={isCrossNudgeLoading}
+              title="현재 보고 있는 멘토 외의 다른 멘토가 AI로 상황을 판단해 상단 알림을 보냅니다"
+              className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-pink-500/20 via-purple-500/20 to-amber-500/20 hover:from-pink-500/30 hover:to-amber-500/30 border border-pink-400/40 text-pink-200 text-[11px] sm:text-xs font-extrabold transition cursor-pointer shadow-[0_0_15px_rgba(236,72,153,0.2)]"
+            >
+              <Bell className="w-3.5 h-3.5 text-pink-400 animate-pulse" />
+              <span className="hidden sm:inline">타 멘토 AI 알림</span>
+              <span className="sm:hidden">알림</span>
+            </button>
+
+            {/* Mobile/Tablet Toggle for Learning Materials Collection Hub */}
             <button
               type="button"
               onClick={() => setIsMobileLabOpen((v) => !v)}
               className="xl:hidden inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-400/30 text-sky-200 text-[11px] font-bold transition cursor-pointer"
             >
-              <Box className="w-3.5 h-3.5 text-sky-400" />
-              <span>3D & Quiz</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                handleSendMessage(
-                  `Synthesize a deeper 3D spatial model for #${activeChannel.slug} (${activeChannel.title})!`,
-                  'generate_3d'
-                )
-              }
-              disabled={isLoading}
-              className="hidden xl:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/15 text-slate-200 text-xs font-bold transition cursor-pointer"
-            >
-              <Box className="w-3.5 h-3.5 text-sky-400" />
-              <span>New 3D View</span>
-            </button>
-
-            {/* Toggle Standalone Room QA Test Console */}
-            <button
-              type="button"
-              onClick={() => setIsRoomTestOpen((v) => !v)}
-              title="Toggle Standalone Room Test Console"
-              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-[11px] font-extrabold transition cursor-pointer ${
-                isRoomTestOpen
-                  ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-[0_0_16px_rgba(251,191,36,0.35)]'
-                  : 'bg-amber-500/15 hover:bg-amber-500/25 border-amber-400/35 text-amber-200'
-              }`}
-            >
-              <span>🧪 Room QA</span>
+              <FolderOpen className="w-3.5 h-3.5 text-sky-400" />
+              <span>
+                자료함 ({scopedMaterials.length + uploadedFilesInScope.length})
+              </span>
             </button>
           </div>
         </header>
 
-        {/* Collapsible Standalone Room Test Console (Mentor Switch + Level Calibration + Proactive Message Simulator) */}
-        {isRoomTestOpen && (
-          <div className="shrink-0 px-4 py-3 border-b border-amber-400/25 bg-gradient-to-r from-amber-500/[0.08] via-slate-900/95 to-sky-500/[0.08] space-y-2.5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded-full bg-amber-400/20 border border-amber-400/40 text-amber-200 text-[10px] font-black uppercase tracking-wider">
-                  🧪 Room Test Sandbox
-                </span>
-                <span className="text-[11px] text-slate-300">
-                  Active Mentor:{' '}
-                  <strong className="text-white">{activeMentor.name}</strong> (
-                  <span style={{ color: activeMentor.accentColor }}>
-                    {activeMentor.shortTag}
+        {/* =================================================================
+            CROSS-MENTOR AI PROACTIVE TOP NOTIFICATION BANNER (상단 알림)
+            Sent by a mentor OTHER than the mentor the user is currently viewing!
+           ================================================================= */}
+        {isCrossNudgeVisible && crossMentorNudge && (
+          <div
+            role="region"
+            aria-label="Cross-Mentor AI Proactive Top Notification"
+            className="mx-4 mt-3 p-3.5 rounded-2xl border shadow-[0_12px_36px_rgba(0,0,0,0.55)] relative overflow-hidden transition-all duration-300"
+            style={{
+              background: `linear-gradient(135deg, ${crossMentorNudge.fromMentorAccentColor}22 0%, rgba(15, 23, 42, 0.96) 55%, ${crossMentorNudge.fromMentorSecondaryColor}18 100%)`,
+              borderColor: `${crossMentorNudge.fromMentorAccentColor}66`,
+            }}
+          >
+            {/* Top Animated Glow Line */}
+            <div
+              className="absolute top-0 left-0 right-0 h-1"
+              style={{
+                background: `linear-gradient(90deg, ${crossMentorNudge.fromMentorAccentColor}, ${crossMentorNudge.fromMentorSecondaryColor}, ${crossMentorNudge.fromMentorAccentColor})`,
+              }}
+            />
+
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+              {/* Left: Sending Mentor Avatar + AI Situation Badge + Message */}
+              <div className="flex items-start gap-3 min-w-0">
+                <div className="relative shrink-0">
+                  <RiveAvatar
+                    key={`cross-nudge-avatar-${crossMentorNudge.fromMentorId}`}
+                    rivSrc={crossMentorNudge.fromMentorRivFile}
+                    state="happy"
+                    accentColor={crossMentorNudge.fromMentorAccentColor}
+                    secondaryColor={crossMentorNudge.fromMentorSecondaryColor}
+                    size={52}
+                    mentorName={crossMentorNudge.fromMentorName}
+                    stateMachineName="Character"
+                  />
+                  <span
+                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black text-slate-950 shadow"
+                    style={{
+                      backgroundColor: crossMentorNudge.fromMentorAccentColor,
+                    }}
+                    title="타 멘토 상단 알림"
+                  >
+                    🔔
                   </span>
-                  ) · Course:{' '}
-                  <strong className="text-sky-300">
-                    #{activeChannel.slug}
-                  </strong>
-                </span>
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                    <span
+                      className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full text-slate-950"
+                      style={{
+                        backgroundColor: crossMentorNudge.fromMentorAccentColor,
+                      }}
+                    >
+                      🔔 타 멘토 상단 알림 · {crossMentorNudge.fromMentorName} (
+                      {crossMentorNudge.fromMentorShortTag})
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/10 text-sky-200 border border-sky-400/30">
+                      🤖 AI 상황 판단: {crossMentorNudge.aiSituationSummary}
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-200 border border-amber-400/35">
+                      {crossMentorNudge.promisedMaterialType === '3d_preview'
+                        ? '🧊 맞춤 3D Preview 제작 완료'
+                        : '🎮 맞춤 미니게임 제작 완료'}
+                    </span>
+                  </div>
+
+                  <p className="text-xs sm:text-[13px] font-semibold text-white leading-relaxed">
+                    {crossMentorNudge.notificationText}
+                  </p>
+                  <p className="text-[11px] text-slate-300 mt-1">
+                    💡 지난번 어려워했던 주제:{' '}
+                    <span className="font-bold text-amber-300">
+                      {crossMentorNudge.previousStruggleConcept}
+                    </span>{' '}
+                    → 채널{' '}
+                    <span className="font-mono text-sky-300">
+                      #{crossMentorNudge.targetChannelSlug}
+                    </span>
+                  </p>
+                </div>
               </div>
 
-              <div className="flex items-center gap-1.5">
+              {/* Right: Action Buttons (Switch to Mentor & Open 3D Preview/Game, Cycle Another Mentor, Dismiss) */}
+              <div className="flex items-center gap-2 shrink-0 self-end lg:self-center">
                 <button
                   type="button"
-                  onClick={handleResetActiveCourseThread}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/[0.07] hover:bg-white/[0.15] border border-white/15 text-[10px] font-bold text-slate-200 cursor-pointer transition"
+                  onClick={handleAcceptCrossMentorNudge}
+                  className="px-3.5 py-2 rounded-xl text-xs font-black text-slate-950 transition transform hover:scale-[1.02] cursor-pointer shadow-lg flex items-center gap-1.5"
+                  style={{
+                    background: `linear-gradient(135deg, ${crossMentorNudge.fromMentorAccentColor}, ${crossMentorNudge.fromMentorSecondaryColor})`,
+                  }}
                 >
-                  <RefreshCw className="w-3 h-3 text-sky-300" />
-                  <span>Reset Thread</span>
+                  {crossMentorNudge.promisedMaterialType === '3d_preview' ? (
+                    <Box className="w-3.5 h-3.5" />
+                  ) : (
+                    <Gamepad2 className="w-3.5 h-3.5" />
+                  )}
+                  <span>{crossMentorNudge.ctaLabel}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => triggerCrossMentorNotification()}
+                  disabled={isCrossNudgeLoading}
+                  title="다른 멘토의 AI 상단 알림 보기"
+                  className="px-2.5 py-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.15] border border-white/15 text-[11px] font-bold text-slate-200 transition cursor-pointer flex items-center gap-1"
+                >
+                  <RefreshCw
+                    className={`w-3.5 h-3.5 ${
+                      isCrossNudgeLoading ? 'animate-spin text-sky-400' : ''
+                    }`}
+                  />
+                  <span className="hidden sm:inline">다른 멘토</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsCrossNudgeVisible(false)}
+                  title="상단 알림 닫기"
+                  className="p-1.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.12] text-slate-400 hover:text-white transition cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
                 </button>
               </div>
-            </div>
-
-            {/* Row 1: 1-Click Mentor Profile Switcher + Student Level Calibration */}
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-white/[0.06]">
-              <div className="flex flex-wrap items-center gap-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1">
-                  Switch Mentor:
-                </span>
-                {workspaceMentors.map((m) => {
-                  const active = m.id === activeMentor.id;
-                  return (
-                    <button
-                      key={`qa-mentor-${m.id}`}
-                      type="button"
-                      onClick={() => handleSelectWorkspaceMentor(m)}
-                      className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition cursor-pointer ${
-                        active
-                          ? 'bg-white text-slate-950 border-white shadow-sm'
-                          : 'bg-slate-950/70 text-slate-300 border-white/10 hover:border-white/30 hover:text-white'
-                      }`}
-                    >
-                      {m.name}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="flex flex-wrap items-center gap-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1">
-                  Simulate Level:
-                </span>
-                {(
-                  [
-                    'unassessed',
-                    'beginner',
-                    'intermediate',
-                    'advanced',
-                  ] as StudentLevel[]
-                ).map((lvl) => {
-                  const active = assessedLevel === lvl;
-                  return (
-                    <button
-                      key={`qa-lvl-${lvl}`}
-                      type="button"
-                      onClick={() => handleSimulateStudentLevel(lvl)}
-                      className={`px-2 py-1 rounded-lg text-[10px] font-bold capitalize border transition cursor-pointer ${
-                        active
-                          ? 'bg-amber-400 text-slate-950 border-amber-300'
-                          : 'bg-slate-950/70 text-slate-300 border-white/10 hover:border-white/30'
-                      }`}
-                    >
-                      {lvl}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Row 2: Course-Contextual Proactive Message Simulator */}
-            <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-white/[0.06]">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1">
-                Proactive Triggers (#{activeChannel.slug}):
-              </span>
-              <button
-                type="button"
-                onClick={() => handleMentorSpeakFirst('3d_pointout')}
-                className="px-2.5 py-1 rounded-lg bg-sky-500/15 hover:bg-sky-500/25 border border-sky-400/30 text-sky-200 text-[10px] font-bold cursor-pointer transition"
-              >
-                🔍 3D Node Point-Out
-              </button>
-              <button
-                type="button"
-                onClick={() => handleMentorSpeakFirst('socratic_quiz')}
-                className="px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/30 text-amber-200 text-[10px] font-bold cursor-pointer transition"
-              >
-                🎯 Socratic Quiz (+10🍬)
-              </button>
-              <button
-                type="button"
-                onClick={() => handleMentorSpeakFirst('real_world_tip')}
-                className="px-2.5 py-1 rounded-lg bg-purple-500/15 hover:bg-purple-500/25 border border-purple-400/30 text-purple-200 text-[10px] font-bold cursor-pointer transition"
-              >
-                💡 Real-World Course Tip
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuizComplete(true, 25)}
-                className="px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-400/30 text-emerald-200 text-[10px] font-bold cursor-pointer transition"
-              >
-                🏆 Simulate Quiz Win (+25🍬)
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuizComplete(false, 0)}
-                className="px-2.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 border border-rose-400/30 text-rose-200 text-[10px] font-bold cursor-pointer transition"
-              >
-                💡 Simulate Quiz Wrong Hint
-              </button>
             </div>
           </div>
         )}
@@ -2570,6 +3030,81 @@ export function MentorStudioView({
                     {msg.text}
                   </div>
 
+                  {/* User Uploaded File Attachments Card */}
+                  {msg.attachments && msg.attachments.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {msg.attachments.map((att) => (
+                        <div
+                          key={att.id}
+                          className="flex items-start gap-2.5 px-3 py-2 rounded-xl bg-slate-900/90 border border-sky-400/30 max-w-sm"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-sky-500/15 border border-sky-400/30 flex items-center justify-center shrink-0 mt-0.5">
+                            <FileText className="w-4 h-4 text-sky-300" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-bold text-white truncate">
+                                {att.name}
+                              </span>
+                              <span className="text-[10px] font-mono text-slate-400 shrink-0">
+                                ({formatFileSize(att.size)})
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-sky-300/90 mt-0.5">
+                              {att.textContent
+                                ? `텍스트 내용 추출됨 (${att.textContent.length.toLocaleString()}자) · 우측 자료함에 보관됨`
+                                : '첨부 파일 메타데이터 전달됨 · 우측 자료함에 보관됨'}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Teacher's Inline JS/HTML Interactive Mini-Preview (Gemini 4 Argon Autonomous Material) */}
+                  {isMentor && msg.learningMaterial && (
+                    <div>
+                      <LearningMaterialPreviewCard
+                        material={msg.learningMaterial}
+                        mentorId={activeMentor.id}
+                        mentorName={activeMentor.name}
+                        roleTitle={activeMentor.roleTitle}
+                        subject={activeMentor.subject}
+                        accentColor={activeMentor.accentColor}
+                        assessedLevel={msg.assessedLevel || assessedLevel}
+                        scene3d={msg.scene3d || currentThread.scene3d}
+                        quiz={
+                          msg.quiz || currentThread.quiz || activeChannel.quiz
+                        }
+                        onClaimCandyReward={(amount, reason) => {
+                          addCandy(amount);
+                          triggerTemporaryAvatarState('happy', 3800);
+                          showCandyNotification(`+${amount} 🍬 ${reason}`);
+                        }}
+                        onRequestRegenerateFormat={(type, reqMode) => {
+                          const meta = MATERIAL_TYPE_META[type];
+                          handleSendMessage(
+                            `Create a custom ${meta.label} (${meta.koreanHint}) for #${activeChannel.slug} (${activeChannel.title}) calibrated to my ${LEVEL_BADGE_MAP[assessedLevel].label} level!`,
+                            reqMode
+                          );
+                        }}
+                      />
+                      <div className="mt-1.5 flex items-center justify-end">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedMaterialId(msg.id);
+                            setIsMobileLabOpen(true);
+                          }}
+                          className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-300 hover:text-sky-200 px-2.5 py-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 border border-sky-400/25 transition cursor-pointer"
+                        >
+                          <FolderOpen className="w-3 h-3 text-sky-400" />
+                          <span>우측 학습 자료함에서 보기</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Suggested Follow-up Chips */}
                   {isMentor &&
                     msg.suggestedFollowUps &&
@@ -2579,7 +3114,9 @@ export function MentorStudioView({
                           <button
                             key={idx}
                             type="button"
-                            onClick={() => handleSendMessage(followUp, 'chat')}
+                            onClick={() =>
+                              handleSendMessage(followUp, selectedMaterialMode)
+                            }
                             disabled={isLoading}
                             className="text-left px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-sky-500/15 border border-white/10 hover:border-sky-400/40 text-[11px] text-sky-300 transition cursor-pointer"
                           >
@@ -2597,8 +3134,10 @@ export function MentorStudioView({
             <div className="flex items-center gap-3 text-xs text-amber-300 bg-slate-900/60 border border-amber-400/20 rounded-2xl px-4 py-3">
               <RefreshCw className="w-4 h-4 animate-spin text-amber-400" />
               <span>
-                <strong>{activeMentor.name}</strong> is thinking & synthesizing
-                a 3D scene for <strong>#{activeChannel.slug}</strong>...
+                <strong>{activeMentor.name}</strong> is diagnosing your level
+                with <strong>Gemini 4 Argon</strong> & authoring an interactive{' '}
+                <strong>JS/HTML Mini-Preview</strong> for{' '}
+                <strong>#{activeChannel.slug}</strong>...
               </span>
             </div>
           )}
@@ -2606,15 +3145,127 @@ export function MentorStudioView({
           <div ref={chatEndRef} />
         </div>
 
-        {/* Starter Prompts Bar + Slack Message Composer */}
-        <div className="p-4 border-t border-white/[0.08] bg-slate-950/60 space-y-2.5">
+        {/* Gemini 4 Argon Material Format Selector + Starter Prompts + File Upload + Slack Message Composer */}
+        <div className="p-3.5 sm:p-4 border-t border-white/[0.08] bg-slate-950/60 space-y-2.5">
+          {/* Autonomous / Manual Material Format Bar */}
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 shrink-0 mr-0.5">
+                학습 자료 생성 모드:
+              </span>
+
+              <button
+                type="button"
+                disabled={isLoading}
+                onClick={() => setSelectedMaterialMode('auto_recommend')}
+                className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[11px] font-extrabold transition cursor-pointer ${
+                  selectedMaterialMode === 'auto_recommend'
+                    ? 'bg-amber-400/20 border-amber-300/60 text-amber-200 shadow-[0_0_14px_rgba(251,191,36,0.2)]'
+                    : 'bg-white/[0.04] border-white/10 text-slate-400 hover:text-white'
+                }`}
+                title="Gemini 4 Argon automatically diagnoses your level and picks 3D Preview, Mini Game, Small Test, or Image Explanation"
+              >
+                <Sparkles className="w-3 h-3 text-amber-300" />
+                <span>Auto (수준별 추천)</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={isLoading}
+                onClick={() => {
+                  setSelectedMaterialMode('generate_3d');
+                  if (!inputPrompt.trim() && pendingAttachments.length === 0) {
+                    handleSendMessage(
+                      `Build an interactive 3D Preview for #${activeChannel.slug} (${activeChannel.title}) calibrated to my level!`,
+                      'generate_3d'
+                    );
+                  }
+                }}
+                className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[11px] font-bold transition cursor-pointer ${
+                  selectedMaterialMode === 'generate_3d'
+                    ? 'bg-sky-500/20 border-sky-400/60 text-sky-200'
+                    : 'bg-white/[0.04] border-white/10 text-slate-400 hover:text-sky-200'
+                }`}
+              >
+                <Box className="w-3 h-3 text-sky-400" />
+                <span>3D Preview</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={isLoading}
+                onClick={() => {
+                  setSelectedMaterialMode('generate_mini_game');
+                  if (!inputPrompt.trim() && pendingAttachments.length === 0) {
+                    handleSendMessage(
+                      `Create a playable JS/HTML Mini Game for #${activeChannel.slug} (${activeChannel.title}) calibrated to my level!`,
+                      'generate_mini_game'
+                    );
+                  }
+                }}
+                className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[11px] font-bold transition cursor-pointer ${
+                  selectedMaterialMode === 'generate_mini_game'
+                    ? 'bg-emerald-500/20 border-emerald-400/60 text-emerald-200'
+                    : 'bg-white/[0.04] border-white/10 text-slate-400 hover:text-emerald-200'
+                }`}
+              >
+                <Gamepad2 className="w-3 h-3 text-emerald-400" />
+                <span>Mini Game</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={isLoading}
+                onClick={() => {
+                  setSelectedMaterialMode('generate_small_test');
+                  if (!inputPrompt.trim() && pendingAttachments.length === 0) {
+                    handleSendMessage(
+                      `Make an interactive Small Test for #${activeChannel.slug} (${activeChannel.title}) calibrated to my level!`,
+                      'generate_small_test'
+                    );
+                  }
+                }}
+                className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[11px] font-bold transition cursor-pointer ${
+                  selectedMaterialMode === 'generate_small_test'
+                    ? 'bg-amber-500/20 border-amber-400/60 text-amber-200'
+                    : 'bg-white/[0.04] border-white/10 text-slate-400 hover:text-amber-200'
+                }`}
+              >
+                <ClipboardCheck className="w-3 h-3 text-amber-400" />
+                <span>Small Test</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={isLoading}
+                onClick={() => {
+                  setSelectedMaterialMode('generate_image_explanation');
+                  if (!inputPrompt.trim() && pendingAttachments.length === 0) {
+                    handleSendMessage(
+                      `Create an interactive Image Explanation diagram for #${activeChannel.slug} (${activeChannel.title}) calibrated to my level!`,
+                      'generate_image_explanation'
+                    );
+                  }
+                }}
+                className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[11px] font-bold transition cursor-pointer ${
+                  selectedMaterialMode === 'generate_image_explanation'
+                    ? 'bg-purple-500/20 border-purple-400/60 text-purple-200'
+                    : 'bg-white/[0.04] border-white/10 text-slate-400 hover:text-purple-200'
+                }`}
+              >
+                <ImageIcon className="w-3 h-3 text-purple-400" />
+                <span>Image Explanation</span>
+              </button>
+            </div>
+          </div>
+
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
             {activeChannel.starterPrompts.map((prompt, idx) => (
               <button
                 key={idx}
                 type="button"
                 disabled={isLoading}
-                onClick={() => handleSendMessage(prompt, 'chat')}
+                onClick={() => handleSendMessage(prompt, selectedMaterialMode)}
                 className="shrink-0 px-3 py-1 rounded-full bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-[11px] text-slate-300 hover:text-white transition cursor-pointer"
               >
                 {prompt}
@@ -2622,24 +3273,95 @@ export function MentorStudioView({
             ))}
           </div>
 
+          {/* Pending File Attachments Preview Bar */}
+          {pendingAttachments.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-xl bg-slate-900/90 border border-sky-400/30">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-sky-300 mr-1">
+                첨부 파일 ({pendingAttachments.length}):
+              </span>
+              {pendingAttachments.map((att) => (
+                <div
+                  key={att.id}
+                  className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-sky-500/15 border border-sky-400/35 text-xs text-white"
+                >
+                  <FileText className="w-3.5 h-3.5 text-sky-300 shrink-0" />
+                  <span className="font-bold truncate max-w-[180px]">
+                    {att.name}
+                  </span>
+                  <span className="text-[10px] font-mono text-slate-300">
+                    {formatFileSize(att.size)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemovePendingAttachment(att.id)}
+                    className="text-slate-400 hover:text-rose-300 transition cursor-pointer"
+                    title="첨부 취소"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Hidden File Input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            onChange={handleFileSelect}
+            className="hidden"
+            accept=".txt,.md,.json,.csv,.py,.js,.ts,.tsx,.jsx,.html,.css,.sql,.yaml,.yml,.xml,.log,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip,text/*"
+          />
+
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              handleSendMessage();
+              handleSendMessage(undefined, selectedMaterialMode);
             }}
             className="flex items-center gap-2"
           >
+            {/* File Upload Trigger Button (Active) */}
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={() => fileInputRef.current?.click()}
+              title="학습 파일 첨부 (.txt, .md, .py, .js, .ts, .csv, .json, .pdf 등)"
+              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-white/[0.06] hover:bg-sky-500/20 border border-white/15 hover:border-sky-400/40 text-xs font-bold text-slate-200 hover:text-sky-200 transition cursor-pointer"
+            >
+              <Paperclip className="w-3.5 h-3.5 text-sky-400" />
+              <span className="hidden sm:inline">파일 첨부</span>
+            </button>
+
+            {/* Planned Multimodal Upload Indicators (Voice / Image / Video - Next Priority) */}
+            <div
+              className="hidden lg:inline-flex items-center gap-1 px-2.5 py-2 rounded-xl bg-white/[0.02] border border-white/[0.06] text-[10px] text-slate-500 shrink-0"
+              title="음성, 이미지, 영상 업로드는 다음 순위로 지원 예정입니다"
+            >
+              <Mic className="w-3 h-3 text-slate-500" />
+              <ImageIcon className="w-3 h-3 text-slate-500" />
+              <Video className="w-3 h-3 text-slate-500" />
+              <span>음성·이미지·영상 추후 지원</span>
+            </div>
+
             <input
               type="text"
               value={inputPrompt}
               onChange={(e) => setInputPrompt(e.target.value)}
               disabled={isLoading}
-              placeholder={`Message #${activeChannel.slug} (Ask ${activeMentor.name} for a 3D model or quiz)...`}
+              placeholder={
+                pendingAttachments.length > 0
+                  ? `첨부한 파일(${pendingAttachments.length}개)에 대해 ${activeMentor.name}에게 질문하거나 바로 전송하세요...`
+                  : `Message #${activeChannel.slug} 또는 학습 파일을 첨부해 질문하세요...`
+              }
               className="flex-1 bg-slate-900 border border-white/15 focus:border-sky-400 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-white placeholder:text-slate-500 focus:outline-none"
             />
             <button
               type="submit"
-              disabled={isLoading || !inputPrompt.trim()}
+              disabled={
+                isLoading ||
+                (!inputPrompt.trim() && pendingAttachments.length === 0)
+              }
               className="px-4 py-2.5 rounded-xl bg-sky-400 hover:bg-sky-300 disabled:opacity-40 text-slate-950 font-black text-xs inline-flex items-center gap-1.5 transition cursor-pointer"
             >
               <Send className="w-3.5 h-3.5" />
@@ -2649,7 +3371,7 @@ export function MentorStudioView({
         </div>
       </main>
 
-      {/* Mobile/Tablet Backdrop for 3D & Quiz Drawer */}
+      {/* Mobile/Tablet Backdrop for Learning Materials Hub */}
       {isMobileLabOpen && (
         <div
           className="fixed inset-0 z-30 bg-black/65 backdrop-blur-xs xl:hidden"
@@ -2658,46 +3380,388 @@ export function MentorStudioView({
       )}
 
       {/* =====================================================================
-          COLUMN 4: INTERACTIVE 3D ARGON VIEWER & ADAPTIVE CANDY QUIZ
+          COLUMN 4: LEARNING MATERIALS COLLECTION HUB (학습 자료 보관함 / 모아보기)
          ===================================================================== */}
       <aside
         className={`${
           isMobileLabOpen
-            ? 'fixed right-0 top-14 bottom-0 z-40 flex w-[88vw] max-w-[420px] shadow-2xl'
-            : 'hidden xl:flex w-[440px]'
-        } shrink-0 h-full border-l border-white/[0.08] bg-[#080b14] flex-col overflow-y-auto p-3.5 gap-3.5`}
+            ? 'fixed right-0 top-14 bottom-0 z-40 flex w-[90vw] max-w-[460px] shadow-2xl'
+            : 'hidden xl:flex w-[450px]'
+        } shrink-0 h-full border-l border-white/[0.08] bg-[#080b14] flex-col overflow-hidden`}
       >
-        <div className="h-[340px] shrink-0">
-          <Argon3DViewer
-            scene={currentThread.scene3d}
-            accentColor={activeMentor.accentColor}
-            isGenerating={isLoading}
-            onRequestGenerate3D={(topic) =>
-              handleSendMessage(
-                topic
-                  ? `Generate a 3D visualization for ${topic} in #${activeChannel.slug}`
-                  : `Generate a new 3D visualization for #${activeChannel.slug}: ${activeChannel.title}`,
-                'generate_3d'
-              )
-            }
-          />
+        {/* Top Header: Collection Hub Title + Scope Toggle */}
+        <div className="p-3.5 border-b border-white/[0.08] bg-slate-950/70 space-y-2.5 shrink-0">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-sky-500/15 border border-sky-400/30 flex items-center justify-center shrink-0">
+                <FolderOpen className="w-4 h-4 text-sky-400" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <h2 className="text-xs font-black text-white truncate">
+                    학습 자료 보관함
+                  </h2>
+                  <span className="px-1.5 py-0.5 rounded-full bg-sky-500/15 border border-sky-400/30 text-[10px] font-black text-sky-300">
+                    {scopedMaterials.length}
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-400 truncate">
+                  코스에서 생성된 3D·미니게임·테스트·도식 및 첨부 파일 모아보기
+                </p>
+              </div>
+            </div>
+
+            {/* Mobile Close Button */}
+            <button
+              type="button"
+              onClick={() => setIsMobileLabOpen(false)}
+              className="xl:hidden p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Scope Toggle: Current Course vs All Mentor Courses */}
+          <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-900/90 border border-white/[0.07]">
+            <button
+              type="button"
+              onClick={() => setMaterialScope('channel')}
+              className={`py-1.5 px-2 rounded-lg text-[11px] font-bold transition cursor-pointer truncate ${
+                materialScope === 'channel'
+                  ? 'bg-sky-500/20 text-sky-200 border border-sky-400/40'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              현재 코스 (#{activeChannel.slug})
+            </button>
+            <button
+              type="button"
+              onClick={() => setMaterialScope('mentor')}
+              className={`py-1.5 px-2 rounded-lg text-[11px] font-bold transition cursor-pointer truncate ${
+                materialScope === 'mentor'
+                  ? 'bg-sky-500/20 text-sky-200 border border-sky-400/40'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              {activeMentor.name} 전체 ({allMentorMaterials.length})
+            </button>
+          </div>
+
+          {/* Type Filter Tabs */}
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pt-0.5">
+            {(
+              [
+                { id: 'all', label: '전체', count: scopedMaterials.length },
+                {
+                  id: '3d_preview',
+                  label: '🧊 3D 구조',
+                  count: scopedMaterials.filter(
+                    (m) => m.material.type === '3d_preview'
+                  ).length,
+                },
+                {
+                  id: 'mini_game',
+                  label: '🎮 미니 게임',
+                  count: scopedMaterials.filter(
+                    (m) => m.material.type === 'mini_game'
+                  ).length,
+                },
+                {
+                  id: 'small_test',
+                  label: '📝 미니 테스트',
+                  count: scopedMaterials.filter(
+                    (m) => m.material.type === 'small_test'
+                  ).length,
+                },
+                {
+                  id: 'image_explanation',
+                  label: '🖼️ 도식·해설',
+                  count: scopedMaterials.filter(
+                    (m) => m.material.type === 'image_explanation'
+                  ).length,
+                },
+              ] as {
+                id: 'all' | LearningMaterialType;
+                label: string;
+                count: number;
+              }[]
+            ).map((tab) => {
+              const active = materialFilter === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setMaterialFilter(tab.id)}
+                  className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold border transition cursor-pointer ${
+                    active
+                      ? 'bg-white text-slate-950 border-white'
+                      : 'bg-white/[0.04] text-slate-400 border-white/10 hover:text-white'
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                  <span
+                    className={`text-[9px] px-1 rounded-full ${
+                      active
+                        ? 'bg-slate-900/20 text-slate-950'
+                        : 'bg-white/10 text-slate-300'
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        <div className="flex-1">
-          <QuizDrawer
-            quiz={currentThread.quiz}
-            accentColor={activeMentor.accentColor}
-            onAnswerSubmit={(isCorrect, candyEarned) =>
-              handleQuizComplete(isCorrect, candyEarned)
-            }
-            onRequestNewQuiz={() =>
-              handleSendMessage(
-                `Give me a new adaptive quiz for #${activeChannel.slug}!`,
-                'generate_quiz'
-              )
-            }
-            isLoadingQuiz={isLoading}
-          />
+        {/* Scrollable Content: Collected Materials List + Selected Material Viewer + Uploaded Study Files */}
+        <div className="flex-1 overflow-y-auto p-3.5 space-y-4">
+          {/* Section 1: Collected Learning Materials List */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-sky-400" />
+                <span>수집된 학습 자료 목록 ({filteredMaterials.length})</span>
+              </span>
+              {activeCollectedMaterial && (
+                <span className="text-[10px] text-slate-500">
+                  카드를 클릭해 아래에서 열람
+                </span>
+              )}
+            </div>
+
+            {filteredMaterials.length === 0 ? (
+              <div className="p-4 rounded-2xl bg-slate-900/60 border border-white/[0.07] text-center space-y-2.5">
+                <p className="text-xs font-bold text-slate-300">
+                  현재 조건에 해당하는 학습 자료가 아직 없습니다.
+                </p>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  채팅창에서 질문을 보내거나 아래 버튼으로{' '}
+                  <strong className="text-white">#{activeChannel.slug}</strong>{' '}
+                  코스의 맞춤 학습 자료를 생성해 모아보세요.
+                </p>
+                <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1">
+                  <button
+                    type="button"
+                    disabled={isLoading}
+                    onClick={() =>
+                      handleSendMessage(
+                        `Build an interactive 3D Preview for #${activeChannel.slug} (${activeChannel.title})!`,
+                        'generate_3d'
+                      )
+                    }
+                    className="px-2.5 py-1.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-400/30 text-[11px] font-bold text-sky-200 cursor-pointer transition"
+                  >
+                    🧊 3D 구조 생성
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isLoading}
+                    onClick={() =>
+                      handleSendMessage(
+                        `Create a playable JS/HTML Mini Game for #${activeChannel.slug} (${activeChannel.title})!`,
+                        'generate_mini_game'
+                      )
+                    }
+                    className="px-2.5 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-400/30 text-[11px] font-bold text-emerald-200 cursor-pointer transition"
+                  >
+                    🎮 미니 게임 생성
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isLoading}
+                    onClick={() =>
+                      handleSendMessage(
+                        `Make an interactive Small Test for #${activeChannel.slug} (${activeChannel.title})!`,
+                        'generate_small_test'
+                      )
+                    }
+                    className="px-2.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/30 text-[11px] font-bold text-amber-200 cursor-pointer transition"
+                  >
+                    📝 미니 테스트 생성
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-1.5 max-h-[230px] overflow-y-auto pr-0.5">
+                {filteredMaterials.map((item) => {
+                  const meta = MATERIAL_TYPE_META[item.material.type];
+                  const isSelected = activeCollectedMaterial?.id === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setSelectedMaterialId(item.id)}
+                      className={`w-full text-left p-2.5 rounded-xl border transition cursor-pointer flex items-start gap-2.5 ${
+                        isSelected
+                          ? 'bg-sky-500/15 border-sky-400/50 shadow-[0_0_20px_rgba(56,189,248,0.12)]'
+                          : 'bg-slate-900/70 hover:bg-slate-900 border-white/[0.07] hover:border-white/20'
+                      }`}
+                    >
+                      <span
+                        className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[10px] font-extrabold ${meta.badgeClass}`}
+                      >
+                        {meta.icon}
+                        <span>{meta.koreanHint}</span>
+                      </span>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-1.5">
+                          <p className="text-xs font-extrabold text-white truncate">
+                            {item.material.title}
+                          </p>
+                          <span className="text-[10px] text-slate-500 shrink-0">
+                            {item.timestamp}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-[10px] font-bold text-sky-300/90">
+                            #{item.channelSlug}
+                          </span>
+                          <span className="text-[10px] text-slate-500">·</span>
+                          <p className="text-[10px] text-slate-400 truncate">
+                            {item.material.reason}
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Section 2: Active Selected Learning Material Interactive Viewer */}
+          {activeCollectedMaterial && (
+            <div className="pt-2 border-t border-white/[0.08] space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-sky-300">
+                    선택된 학습 자료 상세 보기
+                  </span>
+                  <h3 className="text-xs font-black text-white truncate">
+                    {activeCollectedMaterial.material.title}
+                  </h3>
+                </div>
+                {activeCollectedMaterial.channelId !== activeChannel.id && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setActiveChannelId(activeCollectedMaterial.channelId)
+                    }
+                    className="shrink-0 px-2.5 py-1 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] border border-white/15 text-[10px] font-bold text-sky-300 cursor-pointer transition"
+                  >
+                    #{activeCollectedMaterial.channelSlug} 코스로 이동
+                  </button>
+                )}
+              </div>
+
+              <LearningMaterialPreviewCard
+                key={`hub-viewer-${activeCollectedMaterial.id}`}
+                material={activeCollectedMaterial.material}
+                mentorId={activeMentor.id}
+                mentorName={activeMentor.name}
+                roleTitle={activeMentor.roleTitle}
+                subject={activeMentor.subject}
+                accentColor={activeMentor.accentColor}
+                assessedLevel={activeCollectedMaterial.assessedLevel}
+                scene3d={activeCollectedMaterial.scene3d}
+                quiz={activeCollectedMaterial.quiz}
+                onClaimCandyReward={(amount, reason) => {
+                  addCandy(amount);
+                  triggerTemporaryAvatarState('happy', 3800);
+                  showCandyNotification(`+${amount} 🍬 ${reason}`);
+                }}
+                onRequestRegenerateFormat={(type, reqMode) => {
+                  const meta = MATERIAL_TYPE_META[type];
+                  handleSendMessage(
+                    `Create a custom ${meta.label} (${meta.koreanHint}) for #${activeChannel.slug} (${activeChannel.title}) calibrated to my ${LEVEL_BADGE_MAP[assessedLevel].label} level!`,
+                    reqMode
+                  );
+                }}
+              />
+            </div>
+          )}
+
+          {/* Section 3: User-Uploaded Course Study Files */}
+          <div className="pt-3 border-t border-white/[0.08] space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                <span>
+                  내가 올린 학습 파일 ({uploadedFilesInScope.length})
+                </span>
+              </span>
+              <button
+                type="button"
+                disabled={isLoading}
+                onClick={() => fileInputRef.current?.click()}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-sky-500/15 hover:bg-sky-500/25 border border-sky-400/30 text-[10px] font-bold text-sky-200 cursor-pointer transition"
+              >
+                <Paperclip className="w-3 h-3 text-sky-400" />
+                <span>+ 파일 올리기</span>
+              </button>
+            </div>
+
+            {uploadedFilesInScope.length === 0 ? (
+              <div className="p-3 rounded-xl bg-slate-900/40 border border-white/[0.06] text-[11px] text-slate-400 leading-relaxed">
+                하단 채팅창의 <strong className="text-sky-300">파일 첨부</strong>{' '}
+                버튼으로 코드, 노트, 문서 파일을 올리면 이곳에 자동으로 모아지며
+                멘토가 내용을 분석해 답변합니다.
+                <div className="mt-1.5 text-[10px] text-slate-500">
+                  * 음성(🎤), 이미지(🖼️), 영상(🎬) 업로드는 다음 순위로 지원될
+                  예정입니다.
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                {uploadedFilesInScope.map((fileItem) => (
+                  <div
+                    key={fileItem.id}
+                    className="p-2.5 rounded-xl bg-slate-900/75 border border-white/[0.08] space-y-1.5"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileText className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        <span className="text-xs font-bold text-white truncate">
+                          {fileItem.name}
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-mono text-slate-400 shrink-0">
+                        {formatFileSize(fileItem.size)}
+                      </span>
+                    </div>
+
+                    {fileItem.textContent && (
+                      <pre className="text-[10px] text-slate-300 bg-slate-950/80 border border-white/[0.06] rounded-lg p-2 max-h-24 overflow-y-auto whitespace-pre-wrap font-mono">
+                        {fileItem.textContent.slice(0, 360)}
+                        {fileItem.textContent.length > 360 ? '...' : ''}
+                      </pre>
+                    )}
+
+                    <div className="flex items-center justify-between gap-2 pt-0.5">
+                      <span className="text-[10px] text-slate-500">
+                        #{fileItem.channelSlug} · {fileItem.timestamp}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={isLoading}
+                        onClick={() =>
+                          handleSendMessage(
+                            `업로드한 파일 "${fileItem.name}"의 핵심 개념을 #${activeChannel.slug} 코스와 연결해서 요약하고 퀴즈나 미니게임으로 만들어줘!`,
+                            selectedMaterialMode
+                          )
+                        }
+                        className="px-2 py-0.5 rounded-md bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-400/30 text-[10px] font-bold text-emerald-200 cursor-pointer transition"
+                      >
+                        이 파일로 학습 자료 생성
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </aside>
     </div>

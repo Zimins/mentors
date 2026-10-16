@@ -14,5 +14,5 @@ export default async function StandaloneRoomTestPage({
   const initialMentor =
     (query.mentor ? getMentorById(query.mentor) : undefined) || MENTORS[0];
 
-  return <MentorStudioView mentor={initialMentor} standaloneTestMode={true} />;
+  return <MentorStudioView mentor={initialMentor} />;
 }
