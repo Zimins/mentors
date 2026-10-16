@@ -3,31 +3,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { RiveAvatar } from '@/components/avatar/RiveAvatar';
-import { useUserProgress } from '@/context/UserProgressContext';
-import {
-  CANDY_DISC_PALETTES,
-  CHARM_PARTS,
-  COMBINATORIAL_RIV_RIGS,
-  EYEWEAR_PARTS,
-  getPartsForRivFile,
-  HAIR_STYLE_PARTS,
-  HEADWEAR_PARTS,
-  matchAvatarByParts,
-  OUTFIT_PARTS,
-  randomizeAvatarParts,
-  recommendAvatarPartsForTopic,
-} from '@/data/characterParts';
-import type { AvatarPartsConfig, MentorConfig, Scene3DSpec } from '@/types/mentor';
 import {
   ArrowRight,
   ChevronDown,
-  Dices,
   Hash,
-  Loader2,
   Play,
-  Plus,
   Sparkles,
-  Trash2,
   Wand2,
   X,
 } from 'lucide-react';
@@ -47,8 +28,6 @@ interface HoneycombCell {
   baseY: number;
   dist: number;
   ringScale: number;
-  isCustom?: boolean;
-  customChannels?: string[];
 }
 
 const CUSTOM_CHARACTER_OPTIONS = [
@@ -1093,23 +1072,33 @@ export function WatchHoneycomb() {
                       </div>
                     </div>
 
-                    {/* Subtle specialty label revealed on hover / spotlight */}
-                    {(isHovered || isSpotlight) && (
-                      <div className="pointer-events-none absolute top-[calc(100%+8px)] left-1/2 -translate-x-1/2 z-50 px-2.5 py-0.5 rounded-full bg-slate-950/90 backdrop-blur-md border border-white/15 shadow-[0_8px_20px_rgba(0,0,0,0.85)] whitespace-nowrap flex items-center gap-1.5 animate-in fade-in zoom-in-95 duration-200">
+                    {/* Label below mentor profile:
+                        - Hovered / Mobile Spotlight: Full pill with Mentor Name + Specialty
+                        - Default (Idle): Subtle light-gray specialty tag (shortTag) */}
+                    {isHovered || isSpotlight ? (
+                      <div className="pointer-events-none absolute top-[calc(100%+8px)] left-1/2 -translate-x-1/2 z-50 px-2.5 py-0.5 rounded-full bg-slate-950/95 border border-white/25 shadow-[0_8px_24px_rgba(0,0,0,0.9)] whitespace-nowrap flex items-center gap-1.5 animate-in fade-in zoom-in-95 duration-200">
                         <span
-                          className="w-1.5 h-1.5 rounded-full"
+                          className="w-1.5 h-1.5 rounded-full animate-pulse"
                           style={{ backgroundColor: cell.accentColor }}
                         />
-                        <span className="text-[10px] font-semibold text-white/95">
+                        <span className="text-[10px] font-bold text-white">
                           {cell.name}
                         </span>
                         <span className="text-slate-500">·</span>
                         <span
-                          className="text-[10px] font-medium"
+                          className="text-[10px] font-semibold"
                           style={{ color: cell.accentColor }}
                         >
                           {cell.shortTag}
                         </span>
+                      </div>
+                    ) : (
+                      <div
+                        className={`pointer-events-none absolute top-[calc(100%+6px)] left-1/2 -translate-x-1/2 z-30 whitespace-nowrap text-[10px] sm:text-[11px] font-medium text-slate-400/90 tracking-tight drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)] transition-opacity duration-500 ${
+                          isMentosFlipped ? 'opacity-100' : 'opacity-0'
+                        }`}
+                      >
+                        {cell.shortTag}
                       </div>
                     )}
                   </button>
